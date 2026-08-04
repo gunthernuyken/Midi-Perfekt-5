@@ -1521,6 +1521,11 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--c-text-di
   transform:translate(-50%,-50%);
   background:var(--c-rail);padding-inline:3px;font-weight:600;
 }
+/* Am Taktwechsel auseinanderhalten: eine 1 am Taktende neben einer 0 auf
+   der folgenden Eins las sich als "10". Erste und letzte Zelle eines Takts
+   klemmen die Zeitposition von der Taktlinie weg. */
+.tab .tc.tbar b{inset-inline-start:max(20%,var(--fx,50%));}
+.tab .tc.tlast b{inset-inline-start:min(45%,var(--fx,50%));}
 .vis-mode{
   min-block-size:20px;padding-inline:6px;
   border:1px solid var(--c-border-soft);
@@ -7318,7 +7323,7 @@ function buildTab(){
   for(c=0;c<n;c++)h+='<span class="tch" id="tabh-'+c+'"></span>';
   for(var s=0;s<6;s++){
     h+='<span class="ts">'+TABNAM[s]+'</span>';
-    for(var c=0;c<n;c++)h+='<span class="tc'+(c%TABCPB===0?' tbar':(c%bc===0?' tbeat':''))+'" id="tab-'+s+'-'+c+'"></span>';
+    for(var c=0;c<n;c++)h+='<span class="tc'+(c%TABCPB===0?' tbar':((c+1)%TABCPB===0?' tlast':(c%bc===0?' tbeat':'')))+'" id="tab-'+s+'-'+c+'"></span>';
   }
   h+='<div class="tab-cur" aria-hidden="true"></div>';
   h+='<div class="tab-play" id="tabPlay" aria-hidden="true"></div>';

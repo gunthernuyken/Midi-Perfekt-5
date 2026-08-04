@@ -227,7 +227,7 @@ function buildTab(){
   for(c=0;c<n;c++)h+='<span class="tch" id="tabh-'+c+'"></span>';
   for(var s=0;s<6;s++){
     h+='<span class="ts">'+TABNAM[s]+'</span>';
-    for(var c=0;c<n;c++)h+='<span class="tc'+(c%TABCPB===0?' tbar':(c%bc===0?' tbeat':''))+'" id="tab-'+s+'-'+c+'"></span>';
+    for(var c=0;c<n;c++)h+='<span class="tc'+(c%TABCPB===0?' tbar':((c+1)%TABCPB===0?' tlast':(c%bc===0?' tbeat':'')))+'" id="tab-'+s+'-'+c+'"></span>';
   }
   h+='<div class="tab-cur" aria-hidden="true"></div>';
   h+='<div class="tab-play" id="tabPlay" aria-hidden="true"></div>';
