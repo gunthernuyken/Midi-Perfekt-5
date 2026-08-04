@@ -55,6 +55,8 @@ var I18N={
 'Energy = Dichte/Drive · Complexity = Harmonik/Chromatik':'Energy = density/drive · complexity = harmony/chromaticism',
 '∞ Infinite':'∞ Infinite','● INFINITY OFF':'● INFINITY OFF','● INFINITY ON':'● INFINITY ON',
 'Mutation / Loop %':'Mutation / loop %',
+'Tab-Modus: 4-Takte-Fenster oder synchron scrollen (laufender Takt links, 2 Takte Vorschau)':
+'Tab mode: 4-bar window or synced scrolling (current bar on the left, 2 bars preview)',
 'Bei jedem Loop-Durchlauf mutieren nicht gesperrte Takte. Gesperrte Lanes und Takte bleiben eingefroren.':
  'Unlocked bars mutate on every loop pass. Locked lanes and bars stay frozen.',
 /* --- Blues-Werkstatt ------------------------------------------ */

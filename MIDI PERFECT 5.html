@@ -1474,7 +1474,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--c-text-di
 .vis-chip:hover{border-color:var(--lane);}
 .tab{
   display:grid;
-  grid-template-columns:24px repeat(64,minmax(0,1fr));
+  grid-template-columns:24px repeat(32,minmax(0,1fr));
   position:relative;
   grid-template-rows:26px repeat(6,1fr);
   block-size:196px;
@@ -1501,8 +1501,8 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--c-text-di
 }
 .tab-cur{
   position:absolute;inset-block:26px 0;
-  inline-size:calc((100% - 24px)/8);
-  inset-inline-start:calc(24px + (100% - 24px)*var(--bar,0)/8);
+  inline-size:calc((100% - 24px)/var(--tbars,4));
+  inset-inline-start:calc(24px + (100% - 24px)*var(--bar,0)/var(--tbars,4));
   background:color-mix(in srgb,var(--c-accent) 14%,transparent);
   border-inline:1px solid color-mix(in srgb,var(--c-accent) 50%,transparent);
   pointer-events:none;
@@ -1510,7 +1510,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--c-text-di
 }
 .tab-play{
   position:absolute;inset-block:26px 0;inline-size:2px;
-  inset-inline-start:calc(24px + (100% - 24px)*var(--pos,0)/8);
+  inset-inline-start:calc(24px + (100% - 24px)*var(--pos,0)/var(--tbars,4));
   background:var(--c-accent);
   box-shadow:0 0 6px var(--c-accent);
   opacity:0;pointer-events:none;
@@ -1519,13 +1519,14 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--c-text-di
   position:absolute;
   inset-inline-start:var(--fx,50%);inset-block-start:50%;
   transform:translate(-50%,-50%);
-  background:var(--c-rail);padding-inline:3px;font-weight:600;
+  background:var(--c-rail);padding-inline:1px;font-weight:600;
+  letter-spacing:-0.02em;
 }
 /* Am Taktwechsel auseinanderhalten: eine 1 am Taktende neben einer 0 auf
    der folgenden Eins las sich als "10". Erste und letzte Zelle eines Takts
    klemmen die Zeitposition von der Taktlinie weg. */
-.tab .tc.tbar b{inset-inline-start:max(20%,var(--fx,50%));}
-.tab .tc.tlast b{inset-inline-start:min(45%,var(--fx,50%));}
+.tab .tc.tbar b{inset-inline-start:max(16%,var(--fx,50%));}
+.tab .tc.tlast b{inset-inline-start:min(72%,var(--fx,50%));}
 .vis-mode{
   min-block-size:20px;padding-inline:6px;
   border:1px solid var(--c-border-soft);
@@ -2533,9 +2534,9 @@ details[open]>summary .card-title{margin-block-end:var(--sp-3)}
     <span class="hint">Klaviatur &middot; Farbe = Lane</span>
     <span class="vis-chips" id="pianoChips" role="group" aria-label="Lanes in der Klaviatur"></span>
     <span class="transport-spacer"></span>
-    <span class="hint">Tabulatur &middot; 8 Takte</span>
+    <span class="hint">Tabulatur &middot; 4 Takte</span>
     <span class="vis-chips" id="tabChips" role="group" aria-label="Lanes in der Tabulatur"></span>
-    <button class="vis-mode" id="tabModeTgl" aria-pressed="false" title="Tab-Modus: 8-Takte-Fenster oder synchron scrollen (laufender Takt in der Mitte)">&#9638; Fenster</button>
+    <button class="vis-mode" id="tabModeTgl" aria-pressed="false" title="Tab-Modus: 4-Takte-Fenster oder synchron scrollen (laufender Takt links, 2 Takte Vorschau)">&#9638; Fenster</button>
     <button class="vis-mode" id="diaTgl" aria-pressed="true" title="Griffbilder &uuml;ber der Tabulatur ein-/ausblenden">&#119070; Griffe</button>
     <button class="piano-toggle" aria-expanded="true">Einklappen</button>
   </div>
@@ -2606,6 +2607,8 @@ var I18N={
 'Energy = Dichte/Drive · Complexity = Harmonik/Chromatik':'Energy = density/drive · complexity = harmony/chromaticism',
 '∞ Infinite':'∞ Infinite','● INFINITY OFF':'● INFINITY OFF','● INFINITY ON':'● INFINITY ON',
 'Mutation / Loop %':'Mutation / loop %',
+'Tab-Modus: 4-Takte-Fenster oder synchron scrollen (laufender Takt links, 2 Takte Vorschau)':
+'Tab mode: 4-bar window or synced scrolling (current bar on the left, 2 bars preview)',
 'Bei jedem Loop-Durchlauf mutieren nicht gesperrte Takte. Gesperrte Lanes und Takte bleiben eingefroren.':
  'Unlocked bars mutate on every loop pass. Locked lanes and bars stay frozen.',
 /* --- Blues-Werkstatt ------------------------------------------ */
@@ -7311,7 +7314,7 @@ function addI18n(){
    MP3TAB-Haken im Scheduler, zeitgenau zum hörbaren Note-On. */
 var pianoOn=[1,1,1,1,1], tabOn=[0,1,1,1,1];      // Drums im Tab per Default aus
 var TABSTR=[64,59,55,50,45,40], TABNAM=['e','B','G','D','A','E'], LANEAB=['Dr','Ba','Ch','Ar','Me'];
-var TABBARS=8, TABCPB=8;                          // 8 Takte, Achtel-Raster (je Taktart)
+var TABBARS=4, TABCPB=8, TABMID=1;                // 4 Takte (breitere Zellen), Achtel-Raster; Scroll: 1 zurueck + 2 voraus
 function tabMeterCells(){ return Math.max(4,Math.round((window.BAR||1920)/240)); }
 function buildTab(){
   var t=el('tab'); if(!t)return;
@@ -7319,6 +7322,7 @@ function buildTab(){
   var bc=(window.METER&&window.METER.id==='6/8')?3:2;   // Zellen pro Zaehlzeit
   var h='',n=TABBARS*TABCPB,c;
   t.style.gridTemplateColumns='24px repeat('+n+',minmax(0,1fr))';
+  t.style.setProperty('--tbars',TABBARS);
   h+='<span class="ts"></span>';
   for(c=0;c<n;c++)h+='<span class="tch" id="tabh-'+c+'"></span>';
   for(var s=0;s<6;s++){
@@ -7342,8 +7346,9 @@ function tabPut(s,c,txt,li){
   e2.appendChild(b); e2.classList.add('has');
 }
 var tabWin=-1, tabBar=-1, tabMode='win', diaOn=true;
-/* Zwei Modi: 'win' fuellt das 8-Takte-Fenster, 'scroll' schiebt pro Takt nach
-   links (laufender Takt fest in der Mitte). Beide zeichnen eine VORSCHAU aus
+/* Zwei Modi: 'win' fuellt das 4-Takte-Fenster, 'scroll' schiebt pro Takt nach
+   links (laufender Takt fest auf Position TABMID, 2 Takte Vorschau rechts).
+   Beide zeichnen eine VORSCHAU aus
    den bereits generierten Loop-Events (sched.ev): kommende Noten stehen
    gedimmt im Raster und werden beim echten Note-On fest. Geplantes, das nicht
    gespielt wird (Lane aus), bleibt gedimmt stehen. */
@@ -7364,12 +7369,34 @@ function tabWipe(c0,c1){
 }
 function tabPut(s,c,txt,li,pre,frac){
   var e2=el('tab-'+s+'-'+c); if(!e2)return;
+  var fx=Math.max(0,Math.min(1,frac||0))*100, kids=e2.children, i, ox;
+  /* Unisono aus mehreren Lanes (z. B. Bass-Grundton + Akkord-Grundton):
+     dieselbe Zahl zur selben Zeit nur EINMAL zeigen. Kommt die echte Note
+     auf eine gedimmte Vorschau-Zahl, wird sie dabei fest gemacht. */
+  for(i=0;i<kids.length;i++){
+    ox=parseFloat(kids[i].style.getPropertyValue('--fx'))||0;
+    if(kids[i].textContent===txt&&Math.abs(ox-fx)<6){
+      if(!pre&&kids[i].className==='pre')kids[i].className='';
+      return;
+    }
+  }
+  /* Verschiedene Zahlen zur selben Zeit in derselben Zelle: nebeneinander
+     auffaechern statt uebereinander drucken - alle Spuren bleiben lesbar. */
+  var moved=true, guard=0;
+  while(moved&&guard++<8){
+    moved=false;
+    for(i=0;i<kids.length;i++){
+      ox=parseFloat(kids[i].style.getPropertyValue('--fx'))||0;
+      if(Math.abs(ox-fx)<28){fx=ox+34;moved=true;}
+    }
+  }
+  if(fx>100)fx=100;
   var b=document.createElement('b');
   b.textContent=txt; b.style.color=window.LANES[li].color;
   b.setAttribute('data-li',li); if(pre)b.className='pre';
   /* Echte Zeitposition statt Zellenmitte: Shuffle-Achtel und 12/8-Feel
      stehen damit dort, wo sie klingen. */
-  b.style.setProperty('--fx',(Math.max(0,Math.min(1,frac||0))*100)+'%');
+  b.style.setProperty('--fx',fx+'%');
   e2.appendChild(b); e2.classList.add('has');
 }
 /* Lagen-Heuristik: Die Saitenwahl orientiert sich an der LAGE des aktuellen
@@ -7383,7 +7410,7 @@ function tabLagePos(bar){
   var base=pickShape(e.root,e.type).base;
   return base>0?base:3;                       // offene Form: um den 3. Bund spielen
 }
-function tabMap(m,col,P){
+function tabMap(m,col,P,li){
   var n=m; while(n<40)n+=12; while(n>79)n-=12;
   if(P==null)P=3;
   var best=null,bestCost=1e9;
@@ -7394,7 +7421,16 @@ function tabMap(m,col,P){
     if(f===0)cost=Math.min(cost,2.5);          // offene Saite bleibt idiomatisch erlaubt
     if(f>0&&(f<P-1||f>P+4))cost+=1.5;          // ausserhalb des Vier-Bund-Fensters
     var c2=el('tab-'+s+'-'+col);
-    if(c2&&c2.childElementCount)cost+=(c2.childElementCount<3?8:1000);
+    if(c2&&c2.childElementCount){
+      /* Nur die EIGENE Lane blockiert eine Saite (ein Akkordgriff spreizt
+         sich weiter ueber die Saiten). Fremde Lanes verdraengen die Zahl
+         NICHT mehr auf einen falschen Bund - beide Spuren teilen sich die
+         natuerliche Saite und ruecken in der Zelle zusammen. */
+      var own=0,kk;
+      for(kk=0;kk<c2.children.length;kk++)
+        if(c2.children[kk].getAttribute('data-li')===String(li))own++;
+      cost+=own?(own<3?8:1000):0.4;
+    }
     if(cost<bestCost){bestCost=cost;best=[f,s];}
   }
   return (bestCost<1000)?best:null;
@@ -7405,7 +7441,7 @@ function tabDraw(m,li,col,pre,frac,P){
     if(dd&&dd.childElementCount<3)tabPut(5,col,'\u00d7',li,pre,frac);
     return;
   }
-  var hit=tabMap(m,col,P);
+  var hit=tabMap(m,col,P,li);
   if(hit)tabPut(hit[1],col,String(hit[0]),li,pre,frac);
 }
 /* Beim echten Note-On die gedimmte Vorschau-Zahl fest machen. */
@@ -7484,7 +7520,7 @@ function tabPreview(startBar,blockStart,nBars){
           var BARt=window.BAR||1920;
           var bar=Math.floor(t/BARt), frac=(t-bar*BARt)/BARt;
           if(bar!==tabBar)tabEnterBar(bar);
-          p=(tabMode==='scroll')?4+frac:(bar%TABBARS)+frac;
+          p=(tabMode==='scroll')?TABMID+frac:(bar%TABBARS)+frac;
         }
       }
     }
@@ -7522,7 +7558,7 @@ window.MP3TAB={
     if(tabMode==='scroll'){
       var d=bar-tabBar, lb=tabLoopBars();
       if(lb){d=((d%lb)+lb)%lb; if(d>lb/2)d-=lb;}  // minimale signierte Distanz (Loop-Wrap)
-      var bc2=4+d;
+      var bc2=TABMID+d;
       if(bc2<0||bc2>=TABBARS)return;
       col=bc2*TABCPB+sub;
     }else{
@@ -7545,8 +7581,8 @@ function tabEnterBar(bar,force){
       else if(d<0)clearTab();                     // echter Ruecksprung (Locate): neu aufbauen
     }
     tabBar=bar;
-    if(tt)tt.style.setProperty('--bar',4);
-    tabPreview(bar,4,4);
+    if(tt)tt.style.setProperty('--bar',TABMID);
+    tabPreview(bar,TABMID,TABBARS-TABMID);
     tabRenderChords();
   }else{
     var win=Math.floor(bar/TABBARS);
@@ -7568,7 +7604,7 @@ function chordBar(bar){
   return gb[bar]||null;
 }
 function tabRenderChords(){
-  var startBar=(tabMode==='scroll')?tabBar-4:(tabWin<0?0:tabWin*TABBARS);
+  var startBar=(tabMode==='scroll')?tabBar-TABMID:(tabWin<0?0:tabWin*TABBARS);
   for(var k=0;k<TABBARS;k++){
     var cell=el('tabh-'+(k*TABCPB)); if(!cell)continue;
     var bar=startBar+k, e=chordBar(bar), name='';
