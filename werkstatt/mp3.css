@@ -1495,7 +1495,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--c-text-di
     linear-gradient(var(--c-border-soft),var(--c-border-soft)) 0 50%/100% 1px no-repeat;
 }
 .tab-cur{
-  position:absolute;inset-block:0;
+  position:absolute;inset-block:26px 0;
   inline-size:calc((100% - 24px)/8);
   inset-inline-start:calc(24px + (100% - 24px)*var(--bar,0)/8);
   background:color-mix(in srgb,var(--c-accent) 14%,transparent);
@@ -1504,7 +1504,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--c-text-di
   transition:inset-inline-start var(--t-fast,.12s) linear;
 }
 .tab-play{
-  position:absolute;inset-block:0;inline-size:2px;
+  position:absolute;inset-block:26px 0;inline-size:2px;
   inset-inline-start:calc(24px + (100% - 24px)*var(--pos,0)/8);
   background:var(--c-accent);
   box-shadow:0 0 6px var(--c-accent);
@@ -1583,6 +1583,8 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--c-text-di
   grid-template-rows:96px repeat(6,1fr);
   block-size:288px;
 }
+.app:has(#diaTgl[aria-pressed="true"]) .tab-cur,
+.app:has(#diaTgl[aria-pressed="true"]) .tab-play{inset-block-start:96px;}
 .app:has(#diaTgl[aria-pressed="true"]) .tab .tch{
   display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;
   line-height:22px;
