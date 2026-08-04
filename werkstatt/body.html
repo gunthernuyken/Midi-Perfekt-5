@@ -1,0 +1,543 @@
+<div class="app" data-playing="false">
+
+<!-- ============================================================
+     TRANSPORTLEISTE — einzige Transportsteuerung der Anwendung.
+     In MIDI PERFECT 2 gab es sie doppelt (Kommandoleiste oben und
+     Transport-Panel), gehalten von einer requestAnimationFrame-Schleife,
+     die beide Richtungen abglich. Hier trägt die Leiste die
+     Original-IDs btnPlay/btnStop/btnDice, die Schleife entfällt.
+     ============================================================ -->
+<header class="transport">
+  <button class="btn bpl" id="btnPlay">&#9654; PLAY</button>
+  <button class="btn bst" id="btnStop" disabled>&#9632; STOP</button>
+  <button class="btn bdice" id="btnDice" title="Alle nicht gesperrten Lanes neu w&uuml;rfeln (R)">&#127922;</button>
+  <span class="transport-sep"></span>
+  <div class="counter">
+    <div class="bct" id="barCtr">--</div>
+    <div class="lct" id="loopCtr">--</div>
+  </div>
+  <div class="bti"><div class="bd" id="b0"></div><div class="bd" id="b1"></div><div class="bd" id="b2"></div><div class="bd" id="b3"></div></div>
+  <div class="mtag" id="mtag"></div>
+  <span class="transport-sep"></span>
+  <span class="tb-lanes" id="tbLanes"></span>
+  <span class="transport-spacer"></span>
+  <span class="sbar"><span class="dot y" id="midiDot"></span><span class="hint nowrap" id="midiStatus">Initialisiere&hellip;</span></span>
+  <button class="rh" id="btnSuQuick" title="Aktuellen Stand als Setup speichern (Cmd/Strg+S)">&#128190; Setup</button>
+  <button class="rh" id="btnSuQuickLoad" title="Gespeichertes Setup laden">&#128194; Laden</button>
+  <button class="lang-toggle" id="langTgl" title="Sprache umschalten / switch language"><b>DE</b>&nbsp;&middot;&nbsp;EN</button>
+</header>
+
+<!-- ============================================================
+     SEITENLEISTE
+     ============================================================ -->
+<nav class="rail" aria-label="Bereiche">
+  <div class="rail-brand"><span>MIDI PERFECT&nbsp;4<small id="buildTag">BUILD 2026-08-01-A</small></span></div>
+  <button class="rail-item" data-view="midi" aria-current="page">
+    <span class="ico" aria-hidden="true">&#9889;</span><span class="label">MIDI &amp; Transport</span><kbd>1</kbd><span class="tip">MIDI &amp; Transport</span></button>
+  <button class="rail-item" data-view="song">
+    <span class="ico" aria-hidden="true">&#9835;</span><span class="label">Song</span><kbd>2</kbd><span class="tip">Song</span></button>
+  <button class="rail-item" data-view="blues">
+    <span class="ico" aria-hidden="true">&#9834;</span><span class="label">Blues-Werkstatt</span><kbd>3</kbd><span class="tip">Blues-Werkstatt</span></button>
+  <button class="rail-item" data-view="lanes">
+    <span class="ico" aria-hidden="true">&#9776;</span><span class="label">Lanes</span><kbd>4</kbd><span class="tip">Lanes</span></button>
+  <button class="rail-item" data-view="sync">
+    <span class="ico" aria-hidden="true">&#8635;</span><span class="label">Sync</span><kbd>5</kbd><span class="tip">Sync</span></button>
+  <button class="rail-item" data-view="export">
+    <span class="ico" aria-hidden="true">&#128190;</span><span class="label">Export &amp; Setups</span><kbd>6</kbd><span class="tip">Export &amp; Setups</span></button>
+  <button class="rail-item" data-view="monitor">
+    <span class="ico" aria-hidden="true">&#9636;</span><span class="label">Monitor</span><kbd>7</kbd><span class="tip">Monitor</span></button>
+  <span class="rail-spacer"></span>
+  <span class="hint rail-keys"><kbd>Leer</kbd> Play/Stop<br><kbd>R</kbd> Reroll &nbsp;<kbd>D</kbd> Styles<br><kbd>&#8679;1-5</kbd> Solo</span>
+  <button class="rail-toggle" aria-expanded="true" title="Seitenleiste ein-/ausklappen">&#9666;&nbsp;<span class="label">Leiste</span></button>
+</nav>
+
+<main class="content">
+
+<!-- ============ 1 · MIDI & TRANSPORT ============ -->
+<section class="view view--midi" id="viewMidi">
+
+  <div class="col">
+    <article class="card">
+      <h2 class="card-title"><span>&#9889; Verbindung</span><span class="hint">Lanes senden auf eigenen Kan&auml;len</span></h2>
+      <div class="form">
+        <label class="lbl" for="midiOut">MIDI Output</label>
+        <select id="midiOut"><option>Initialisiere&hellip;</option></select>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button type="button" class="chip" id="chGuard" title="Blockt JEDE MIDI-Nachricht auf Kan&auml;len, die keiner eingeschalteten Lane geh&ouml;ren &ndash; inkl. Program Change und All-Notes-Off" aria-pressed="false">&#9675; Kanalsperre</button>
+        <button type="button" class="chip" id="monTgl" title="Protokolliert jede gesendete MIDI-Nachricht mit Kanal" aria-pressed="false">&#9675; MIDI-Monitor</button>
+      </div>
+    </article>
+
+    <article class="card">
+      <h2 class="card-title"><span>&#8644; Kanal-Routing</span><span class="hint">Eine Cubase-Spur pro Kanal</span></h2>
+      <div class="form form--2">
+        <label class="lbl" for="allCh">Alle Lanes auf</label>
+        <select id="allCh"></select>
+        <label class="lbl">&nbsp;</label>
+        <button class="rh" id="btnAllCh">&rarr; einen Kanal legen</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="rh" id="btnSpreadCh">&rarr; ab Startkanal verteilen</button>
+        <button class="rh" id="btnGM">&#127928; GM-Standardsounds</button>
+        <button class="rh" id="btnNoGM">&#8856; Sound-Zuweisung aus</button>
+      </div>
+      <p class="chmap" id="chMap" style="margin-top:8px">Routing: &mdash;</p>
+    </article>
+
+    <article class="card card--fill">
+      <h2 class="card-title"><span>&#128220; Protokoll</span><span class="hint">Wandert mit in den Monitor</span></h2>
+      <div class="log-slot"><div class="log" id="log"></div></div>
+    </article>
+  </div>
+
+  <div class="col">
+    <article class="card">
+      <h2 class="card-title"><span>&#9202; Tempo &amp; Feel</span></h2>
+      <div class="form form--2">
+        <label class="lbl" for="bpm">Tempo</label>
+        <div class="sl"><input type="range" id="bpm" min="40" max="240" value="118"><span class="vd" id="bpmVal">118</span></div>
+        <label class="lbl" for="swing">Swing %</label>
+        <div class="sl"><input type="range" id="swing" min="0" max="100" value="58"><span class="vd" id="swingVal">58</span></div>
+        <label class="lbl" for="human">Humanize %</label>
+        <div class="sl"><input type="range" id="human" min="0" max="40" value="14"><span class="vd" id="humanVal">14</span></div>
+        <label class="lbl" for="energy">Energy %</label>
+        <div class="sl"><input type="range" id="energy" min="0" max="100" value="60"><span class="vd" id="energyVal">60</span></div>
+        <label class="lbl" for="cplx">Complexity %</label>
+        <div class="sl"><input type="range" id="cplx" min="0" max="100" value="45"><span class="vd" id="cplxVal">45</span></div>
+        <label class="lbl" for="meterSel">Taktart</label>
+        <select id="meterSel"><option value="4/4" selected>4/4</option><option value="3/4">3/4</option><option value="6/8">6/8</option></select>
+        <label class="lbl" for="loop">Loop</label>
+        <select id="loop">
+          <option value="1">1x</option><option value="2">2x</option><option value="4" selected>4x</option>
+          <option value="8">8x</option><option value="0">&#8734; Endlos</option></select>
+      </div>
+    </article>
+
+    <article class="card">
+      <h2 class="card-title"><span>&#10022; Infinity-Mutation</span></h2>
+      <div class="row">
+        <button class="tgl inf" id="infTgl">&#9675; INFINITY AUS</button>
+      </div>
+      <div class="form" style="margin-top:8px">
+        <label class="lbl" for="mut">Mutation / Loop %</label>
+        <div class="sl"><input type="range" id="mut" min="5" max="100" value="30"><span class="vd" id="mutVal">30</span></div>
+      </div>
+      <p class="hint2">Bei jedem Durchlauf werden nicht gesperrte Takte neu gew&uuml;rfelt. Die Akkorde bleiben, die Ausf&uuml;hrung &auml;ndert sich.</p>
+    </article>
+
+    <details class="card col--fill">
+      <summary><h2 class="card-title"><span>&#9881; Erweitert</span></h2></summary>
+      <div class="row" style="margin-top:8px">
+        <button class="rh undo" id="btnResetLanes" title="Gespeicherten Lane-Zustand verwerfen und Werkseinstellung laden">&#8635; Lane-Zustand zur&uuml;cksetzen</button>
+        <button class="rh" id="btnMonClear">&#8635; Monitor leeren</button>
+      </div>
+    </details>
+  </div>
+</section>
+
+<!-- ============ 2 · SONG ============ -->
+<section class="view view--song" id="viewSong" hidden>
+
+  <article class="card card--full">
+    <h2 class="card-title"><span>&#9835; Akkordfolge</span><span class="hint">Leerzeichen trennt &middot; <code>:n</code> = Takte</span></h2>
+    <div class="form">
+      <label class="lbl" for="chordInput">Progression</label>
+      <input type="text" id="chordInput" class="input-mono" value="A7 D7 A7 A7 D7 D7 A7 A7 E7 D7 A7 E7">
+    </div>
+    <div class="form form--3">
+      <label class="lbl" for="progPreset">Preset</label>
+      <select id="progPreset"><option value="">&mdash; w&auml;hlen &mdash;</option></select>
+      <label class="lbl" for="barsPerChord">Takte pro Akkord</label>
+      <select id="barsPerChord"><option value="1" selected>1</option><option value="2">2</option><option value="4">4</option></select>
+      <label class="lbl" for="defType">Standard-Typ</label>
+      <select id="defType"><option value="maj">maj</option><option value="7" selected>7</option><option value="min">min</option><option value="m7">m7</option></select>
+      <label class="lbl">&nbsp;</label>
+      <div class="row row--tight">
+        <button class="btn bpl" id="btnApply">&Uuml;bernehmen</button>
+        <button class="rh undo" id="btnClear" title="Progression komplett leeren &ndash; Locks und Mutationen werden zur&uuml;ckgesetzt">&#10006; Leeren</button>
+        <span class="err grow" id="seqErr"></span>
+      </div>
+    </div>
+  </article>
+
+  <article class="card card--full card--bars">
+    <h2 class="card-title"><span>&#9638; Takte</span><span class="hint">Klick = sperren &middot; gesperrte Takte mutieren nicht</span></h2>
+    <div class="cdisp" id="cdisp"></div>
+    <details class="sub-hint"><summary class="hint">Suffix-Liste</summary>
+      <p class="hint2" id="hintSuffix">Suffixe: <b>m &middot; 7 &middot; maj7 &middot; m7 &middot; 6 &middot; m6 &middot; 9 &middot; m9 &middot; maj9 &middot; 13 &middot; dim &middot; dim7 &middot; m7b5 &middot; aug &middot; 7#9 &middot; 7b9 &middot; sus4 &middot; sus2</b> &nbsp;|&nbsp; Beispiel: <code>Gm7:2 C7 Fmaj7:2</code></p>
+    </details>
+  </article>
+
+  <article class="card">
+    <h2 class="card-title"><span>&#9711; Tonart</span></h2>
+    <div class="cofwrap"><div id="cof"></div></div>
+    <div class="row row--tight" style="margin-top:8px">
+      <div class="field grow"><label for="keyPc">Tonart</label>
+      <select id="keyPc"></select></div>
+      <div class="field grow"><label for="keyMode">Modus</label>
+      <select id="keyMode">
+        <option value="ionian">Ionisch (Dur)</option><option value="dorian">Dorisch</option>
+        <option value="phrygian">Phrygisch</option><option value="lydian">Lydisch</option>
+        <option value="mixolydian">Mixolydisch</option><option value="aeolian">&Auml;olisch (Moll)</option>
+        <option value="locrian">Lokrisch</option></select></div>
+      <button class="rh" id="btnDetect" title="Tonart aus der aktuellen Progression erkennen">&#128269; erkennen</button>
+    </div>
+    <!-- Leitereigene Akkorde stehen als klickbare Stufen daneben; hier bleiben
+         sie als Textliste erhalten, kosten aber zugeklappt keine Höhe. -->
+    <details class="sub-hint"><summary>Leitereigene Akkorde</summary>
+      <p class="cofinfo" id="diaList"></p></details>
+  </article>
+
+  <div class="col">
+    <article class="card">
+      <h2 class="card-title"><span>&#8593; Stufen</span>
+        <button type="button" class="chip on" id="sevTgl" aria-pressed="false">&#9679; Septakkorde</button></h2>
+      <div class="sugrow" id="degRow"></div>
+    </article>
+    <article class="card">
+      <h2 class="card-title"><span>&#10142; N&auml;chster Akkord</span><span class="hint">Aus dem letzten Akkord abgeleitet</span></h2>
+      <div class="sugrow" id="sugRow"></div>
+    </article>
+  </div>
+
+  <div class="col">
+    <article class="card">
+      <h2 class="card-title"><span>&#8644; Reharmonisierung</span>
+        <span class="hint" id="rhInfo">Erh&auml;lt die Gesamt-Taktzahl</span></h2>
+      <div class="row row--tight">
+        <button class="rh" id="rhTritone">Tritonus-Sub</button>
+        <button class="rh" id="rhSecDom">Sekund&auml;r-Dominanten</button>
+        <button class="rh" id="rhIIV">ii-V einf&uuml;gen</button>
+        <button class="rh" id="rhModal">Modal Interchange</button>
+        <button class="rh" id="rhPass">Durchgangs-Verminderte</button>
+        <button class="rh" id="rhExtUp">Extensions +</button>
+        <button class="rh" id="rhExtDn">Extensions &minus;</button>
+        <button class="rh undo" id="rhUndo">&#8630; R&uuml;ckg&auml;ngig</button>
+      </div>
+    </article>
+    <article class="card">
+      <h2 class="card-title"><span>&#10022; Generator</span></h2>
+      <div class="row row--tight">
+        <div class="field grow"><label for="genGenre">Genre</label>
+        <select id="genGenre">
+          <option value="jazz">Jazz</option><option value="blues" selected>Blues</option>
+          <option value="pop">Pop</option><option value="rock">Rock</option>
+          <option value="modal">Modal</option><option value="rnb">R&amp;B / Neo-Soul</option></select></div>
+        <div class="field"><label for="genBars">L&auml;nge</label>
+        <select id="genBars"><option value="4">4 Takte</option><option value="8" selected>8 Takte</option>
+          <option value="12">12 Takte</option><option value="16">16 Takte</option></select></div>
+        <button class="btn bdice" id="btnGenProg">&#10022; Generieren</button>
+      </div>
+    </article>
+  </div>
+</section>
+
+<!-- ============ 3 · BLUES-WERKSTATT ============ -->
+<section class="view view--blues" id="viewBlues" hidden>
+  <div id="panelBlues" style="display:contents">
+
+  <article class="card">
+    <h2 class="card-title"><span>&#9834; Form</span></h2>
+    <div class="form">
+      <label class="lbl" for="blKey">Tonart</label>
+      <select id="blKey"></select>
+      <label class="lbl" for="blForm">Form</label>
+      <select id="blForm"></select>
+      <label class="lbl" for="blTA">Turnaround</label>
+      <select id="blTA"></select>
+      <label class="lbl">&nbsp;</label>
+      <button type="button" class="chip" id="blQC" title="Takt 2 wird zur IV-Stufe &ndash; der Klassiker gegen den 4-Takte-Leerlauf am Anfang" aria-pressed="false">&#9675; Quick-Change</button>
+      <label class="lbl">&nbsp;</label>
+      <button class="btn bpl" id="blBuild">Progression bauen</button>
+    </div>
+    <p class="hint2" id="blInfo">Schreibt die Form in die Akkordzeile und &uuml;bernimmt sie sofort.</p>
+  </article>
+
+  <article class="card">
+    <h2 class="card-title"><span>&#8597; Transposition</span><span class="hint">Tonart folgt dem Song</span></h2>
+    <div class="row row--tight">
+      <button class="rh" id="blDown">&minus; Halbton</button>
+      <button class="rh" id="blUp">+ Halbton</button>
+    </div>
+    <div class="form" style="margin-top:8px">
+      <label class="lbl" for="blTo">Zieltonart</label>
+      <select id="blTo"></select>
+      <label class="lbl">&nbsp;</label>
+      <button class="rh" id="blToGo">&rarr; transponieren</button>
+      <label class="lbl">&nbsp;</label>
+      <button class="rh" id="blCycle" title="G &rarr; C &rarr; F &rarr; Bb &rarr; Eb &rarr; A &rarr; D &rarr; E &ndash; die Tonarten, die man als Gitarrist sonst nie &uuml;bt">&#8635; &Uuml;bungs-Zirkel weiter</button>
+    </div>
+  </article>
+
+  <article class="card">
+    <h2 class="card-title"><span>&#9835; Groove</span></h2>
+    <div class="row">
+      <button type="button" class="chip on" id="blGroove" title="DRUMS, BASS und CHORDS ziehen zwingend denselben Swing-Wert" aria-pressed="false">&#9679; Groove-Kopplung</button>
+      <button type="button" class="chip on" id="blTAFill" title="Erzwingt einen Fill im letzten Takt der Form" aria-pressed="false">&#9679; Turnaround-Fill</button>
+    </div>
+    <div class="form" style="margin-top:8px">
+      <label class="lbl" for="bbeat">Backbeat 2 &amp; 4</label>
+      <div class="sl"><input type="range" id="bbeat" min="0" max="24" value="10"><span class="vd" id="bbeatVal">10</span></div>
+    </div>
+  </article>
+
+  <article class="card card--span2">
+    <h2 class="card-title"><span>&#9201; Tempofelder</span><span class="hint">Nochmal klicken = n&auml;chste Stufe im Bereich</span></h2>
+    <div id="blTempo" class="row row--tight"></div>
+  </article>
+
+  <article class="card">
+    <h2 class="card-title"><span>&#9776; Chorus-Bogen</span></h2>
+    <div class="row row--tight">
+      <button type="button" class="chip" id="blChorus" title="Baut die Dynamik &uuml;ber mehrere Durchl&auml;ufe auf und wieder ab" aria-pressed="false">&#9675; Chorus-Dynamik</button>
+      <button type="button" class="chip on" id="blArc" title="D&uuml;nn anfangen und schichtweise aufbauen statt nur lauter werden" aria-pressed="false">&#9679; Arrangement-Bogen</button>
+    </div>
+    <div class="form form--2" style="margin-top:8px">
+      <label class="lbl" for="blChLen">Bogen &uuml;ber</label>
+      <select id="blChLen"><option value="2">2 Chorusse</option><option value="3">3 Chorusse</option>
+        <option value="4" selected>4 Chorusse</option><option value="6">6 Chorusse</option></select>
+      <label class="lbl" for="blChRide">Ride ab Chorus</label>
+      <select id="blChRide"><option value="1">2</option><option value="2" selected>3</option><option value="3">4</option></select>
+      <label class="lbl" for="blChCC">Expression CC</label>
+      <input type="number" id="blChCC" class="num-sm" min="0" max="127" value="11">
+      <label class="lbl" for="blChAmp">Velocity-Hub</label>
+      <div class="sl"><input type="range" id="blChAmp" min="0" max="24" value="10"><span class="vd" id="blChAmpVal">10</span></div>
+    </div>
+    <p class="hint2" id="blChInfo">Aus.</p>
+  </article>
+
+  <details class="card card--full">
+    <summary><h2 class="card-title"><span>&#9432; Hinweise zu Swing und Chorus</span></h2></summary>
+    <div class="hint2" id="hintBlues"><b style="color:#22cc88">Swing:</b> 100 % = volles Triolen-Feel. Blues-Shuffle sitzt bei <b>62&ndash;68</b>, Slow Blues 12/8 bei <b>95&ndash;100</b>,
+    Funk-Blues bei 12&ndash;20. Drum-Patterns auf Triolenraster (Blues Shuffle, Jazz Ride, Purdie) sind bereits triolisch notiert und werden
+    vom Swing-Regler bewusst nicht zusätzlich verschoben &ndash; sonst käme ein doppelter Shuffle heraus.<br>
+    <b style="color:#22cc88">Chorus-Dynamik</b> sendet den Expression-CC auf allen Melodie-/Harmonie-Kanälen. Bei einer Hammond (Blue3, B-3X)
+    kann man dort auch eine Drawbar-CC eintragen; bei Kontakt-Instrumenten passt meist CC11, bei EZbass/EZkeys CC7.
+    Die Hi-Hat wandert ab dem eingestellten Chorus automatisch aufs Ride, im Spitzen-Chorus auf die Glocke.</div>
+  </details>
+  </div>
+</section>
+
+<!-- ============ 4 · LANES ============ -->
+<section class="view view--lanes" id="viewLanes" hidden>
+  <article class="card">
+    <h2 class="card-title"><span>&#9835; Band-Presets</span><span class="hint">Setzt Style, Lane-On/Off und optional Tempo</span></h2>
+    <div class="row row--end">
+      <div class="field" style="min-width:210px">
+        <label class="lbl" for="bandSel">Band-Preset</label>
+        <select id="bandSel"><option value="">&mdash; w&auml;hlen &mdash;</option></select>
+      </div>
+      <button class="rh" id="btnBandApply">&#9835; Band laden</button>
+      <button class="rh" id="btnStyleDice">&#127922; Alle Styles w&uuml;rfeln</button>
+      <button type="button" class="chip" id="bandTempo" title="Tempo und Swing des Presets mit &uuml;bernehmen" aria-pressed="false">&#9675; Tempo/Swing &uuml;bernehmen</button>
+      <button type="button" class="chip" id="bandLanes" title="Wenn aus, bleiben deine ON/OFF-Einstellungen der Lanes beim Laden eines Presets erhalten" aria-pressed="false">&#9679; Lane On/Off &uuml;bernehmen</button>
+      <span class="mini grow" id="bandInfo">Presets setzen Style, Lane-On/Off und optional Tempo &amp; Swing.</span>
+    </div>
+  </article>
+  <div id="lanes"></div>
+</section>
+
+<!-- ============ 5 · SYNC ============ -->
+<section class="view view--sync" id="viewSync" hidden>
+  <div id="panelSync" style="display:contents">
+
+  <article class="card">
+    <h2 class="card-title"><span>&#8635; Clock &amp; Slave</span></h2>
+    <div class="row row--tight">
+      <button class="tgl" id="syncTgl" title="Sendet MIDI Clock (F8) im aktuellen Tempo plus Start/Stop. Cubase kann MIDI Clock nicht empfangen &ndash; nur f&uuml;r Hardware.">&#9675; CLOCK AUS</button>
+      <button class="tgl" id="slaveTgl" title="Der Generator folgt der MIDI Clock einer DAW oder Hardware. Tempo, Start, Stop und Position kommen dann von dort.">&#9675; SLAVE AUS</button>
+    </div>
+    <div class="form" style="margin-top:8px">
+      <label class="lbl" for="clkIn">Clock-Eingang</label>
+      <select id="clkIn"><option value="">&mdash; kein Eingang &mdash;</option></select>
+      <label class="lbl" for="syncPort">Sync-Ausgang</label>
+      <select id="syncPort"><option value="">= Haupt-Output</option></select>
+    </div>
+    <p class="mini" id="syncInfo" style="margin-top:8px">Clock aus.</p>
+    <p class="mini mono" id="slaveInfo">Slave aus.</p>
+  </article>
+
+  <article class="card">
+    <h2 class="card-title"><span>&#9673; Cubase</span></h2>
+    <div class="form">
+      <label class="lbl" for="cubAct">Cubase bei PLAY</label>
+      <select id="cubAct">
+        <option value="none">nichts senden</option><option value="play" selected>Play starten</option>
+        <option value="rec">Aufnahme starten</option></select>
+      <label class="lbl" for="countIn">Count-In</label>
+      <select id="countIn"><option value="0" selected>ohne</option><option value="1">1 Takt</option><option value="2">2 Takte</option></select>
+      <label class="lbl" for="cubStop">Bei STOP</label>
+      <select id="cubStop"><option value="stop" selected>Cubase stoppen</option><option value="none">nichts senden</option></select>
+    </div>
+  </article>
+
+  <article class="card">
+    <h2 class="card-title"><span>&#9654; Sofortbefehle</span></h2>
+    <div class="stack">
+      <button class="rh" id="btnMmcPlay">&#9654; Cubase Play</button>
+      <button class="rh" id="btnMmcRec">&#9679; Cubase Record</button>
+      <button class="rh" id="btnMmcStop">&#9632; Cubase Stop</button>
+      <button class="rh" id="btnClkPulse" title="Nur f&uuml;r Hardware-Sequencer/Drumcomputer. Cubase ignoriert MIDI Clock.">&#9201; Clock-Burst (4 Takte)</button>
+    </div>
+  </article>
+
+  <details class="card card--span2">
+    <summary><h2 class="card-title"><span>&#9881; Erweitert</span></h2></summary>
+    <div class="form form--2" style="margin-top:8px">
+      <label class="lbl" for="syncStart">Transportbefehl</label>
+      <select id="syncStart">
+        <option value="start" selected>Start (F A)</option><option value="continue">Continue (F B)</option>
+        <option value="none">keiner</option></select>
+      <label class="lbl" for="mmcDev">MMC Device</label>
+      <input type="number" id="mmcDev" class="num-sm" min="0" max="127" value="127">
+    </div>
+  </details>
+
+  <details class="card">
+    <summary><h2 class="card-title"><span>&#9432; Anleitung</span></h2></summary>
+    <div class="hint2 scroll-y" id="hintSync"><b style="color:#ffcc00">&#9888; Cubase kann sich nicht auf MIDI Clock synchronisieren.</b> Als Sync-Quelle akzeptiert Cubase ausschließlich
+    MIDI&nbsp;Timecode, ASIO&nbsp;Positioning oder VST&nbsp;System&nbsp;Link – siehe Projekt-Synchronisationseinstellungen &rarr; Quellen.
+    Der Clock-Schalter und der Clock-Burst sind daher für <b>Hardware</b> gedacht (Drumcomputer, Groovebox, Looper).
+    <b>Das Tempo muss in Cubase von Hand auf denselben Wert gesetzt werden.</b><br>
+    <b>Setup Play/Record (funktioniert):</b> Transport &rarr; Projekt-Synchronisationseinstellungen &rarr; Gerätesteuerung &rarr;
+    <b>MMC-Slave aktiv</b>, MIDI-Eingang = IAC-Treiber Bus 1, MMC-Gerätekennung identisch (127 = alle).
+    Record startet mit Record&nbsp;Strobe + Deferred&nbsp;Play. MMC braucht die SysEx-Freigabe des Browsers – Status siehe Log.<br>
+    <b>Count-In</b> lässt Cubase vorlaufen, bevor die erste Note kommt – ideal zum Aufnehmen.<br>
+    <b style="color:#22cc88">Clock-Slave (Cubase gibt den Takt vor):</b> Das ist die Richtung, die mit Cubase wirklich funktioniert.
+    In Cubase unter Projekt-Synchronisationseinstellungen &rarr; <b>Ziele</b> die <b>MIDI-Clock-Ausgabe auf den IAC-Bus</b> aktivieren,
+    hier <b>SLAVE</b> einschalten und denselben Bus als Clock-Eingang wählen. Ein IAC-Bus trägt beide Richtungen gleichzeitig –
+    ein zweiter Bus ist sauberer, aber nicht nötig. Danach starten und stoppen Cubases Transport diese Seite mit,
+    Tempo und Position kommen aus Cubase, der BPM-Regler folgt automatisch.
+    Clock-Ausgang und Slave schließen sich gegenseitig aus.</div>
+  </details>
+  </div>
+</section>
+
+<!-- ============ 6 · EXPORT & SETUPS ============ -->
+<section class="view view--export" id="viewExport" hidden>
+  <div class="col">
+    <article class="card">
+      <h2 class="card-title"><span>&#128190; MIDI Export</span><span class="hint">Type-1 SMF, eine Spur pro Lane</span></h2>
+      <div class="form">
+        <label class="lbl" for="expRep">Wiederholungen</label>
+        <select id="expRep"><option value="1">1x Progression</option><option value="2" selected>2x</option>
+          <option value="4">4x</option><option value="8">8x</option></select>
+        <label class="lbl" for="expVary">Variation pro Durchlauf</label>
+        <select id="expVary"><option value="0">aus (identisch)</option><option value="1" selected>an (mutiert)</option></select>
+        <label class="lbl" for="expHum">Humanize im Export</label>
+        <select id="expHum"><option value="0" selected>nein (clean)</option><option value="1">ja</option></select>
+        <label class="lbl">&nbsp;</label>
+        <button class="btn bexp" id="btnExport">&#11015; .MID exportieren</button>
+      </div>
+      <p class="mini" id="expInfo" style="margin-top:8px">Danach in Cubase per Drag &amp; Drop ins Projekt ziehen.</p>
+    </article>
+    <article class="card">
+      <h2 class="card-title"><span>&#11014; MIDI Import</span><span class="hint">SMF &rarr; Akkorde, Tonart, Taktart, Tempo</span></h2>
+      <div class="imp-drop" id="impDrop" tabindex="0" role="button" aria-label="MIDI-Datei w&auml;hlen oder hierher ziehen">
+        <span>.mid hierher ziehen oder</span>
+        <button class="rh" id="impPick" type="button">&#128193; Datei w&auml;hlen</button>
+      </div>
+      <input type="file" id="impFile" accept=".mid,.midi,audio/midi" style="display:none">
+      <p class="mini" id="impInfo" style="margin-top:8px">Importiert werden Parameter, nie Noten: die Progression landet zur Kontrolle hier, &uuml;bernommen wird erst auf Knopfdruck.</p>
+      <div id="impReview" hidden>
+        <div class="row" style="margin-top:8px">
+          <button type="button" class="chip" id="impUseCore" aria-pressed="true">Kernschleife</button>
+          <button type="button" class="chip" id="impUseFull" aria-pressed="false">Kompletter Verlauf</button>
+        </div>
+        <div class="imp-chips" id="impChips"></div>
+        <label class="lbl" for="impTokens" style="margin-top:6px;display:block">Progression (editierbar)</label>
+        <input type="text" id="impTokens" class="input-mono">
+        <div class="row" style="margin-top:8px">
+          <button class="btn bexp" id="impApply" type="button" title="Schreibt Taktart, Tempo, Tonart und Progression in den Song-Bereich">&#8618; In Song &uuml;bernehmen</button>
+        </div>
+        <div class="row" style="margin-top:6px">
+          <button class="rh" id="impFeel" type="button" title="Setzt Swing, Energy und Complexity auf die aus der Datei gesch&auml;tzten Werte &ndash; nie automatisch, sie verstellen das Spielgef&uuml;hl">Feel &uuml;bernehmen</button>
+        </div>
+      </div>
+    </article>
+    <article class="card">
+      <h2 class="card-title"><span>&#11015; Diese Seite sichern</span></h2>
+      <div class="row">
+        <button class="rh" id="btnSaveHtml">&#11015; Diese Seite speichern</button>
+      </div>
+      <p class="hint2">Sichert die Anwendung mitsamt ihrem aktuellen Zustand als eigenst&auml;ndige Datei.</p>
+    </article>
+  </div>
+
+  <div class="col col--fill" id="panelSetups">
+    <article class="card">
+      <h2 class="card-title"><span>&#128190; Setups</span><span class="hint">Kompletter Arbeitsstand in einem Namen</span></h2>
+      <div class="form">
+        <label class="lbl" for="suName">Name</label>
+        <input type="text" id="suName" placeholder="z. B. Slow Blues in A">
+        <label class="lbl">&nbsp;</label>
+        <button class="btn bexp" id="btnSuSave" title="Speichert Tempo, Feel, Harmonie, Progression, Lanes, Blues-Werkstatt, Export- und Sync-Optionen unter diesem Namen (Cmd/Strg+S)">&#128190; Setup speichern</button>
+        <label class="lbl" for="suList">Gespeicherte Setups</label>
+        <select id="suList" size="6" class="su-list"><option value="">&mdash; keine gespeichert &mdash;</option></select>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="rh" id="btnSuLoad">&#8617; Laden</button>
+        <button class="rh undo" id="btnSuDel">&#10006; L&ouml;schen</button>
+        <button type="button" class="chip" id="suAuto" title="Beim Start automatisch das zuletzt gespeicherte Setup laden" aria-pressed="false">&#9675; Autoload</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="rh" id="btnSuExport" title="Gew&auml;hltes Setup als Datei sichern &ndash; ohne Auswahl werden alle gesichert">&#11015; Als .json sichern</button>
+        <button class="rh" id="btnSuImport">&#11014; .json laden</button>
+        <button class="rh" id="btnSuLast" title="Der Stand, wie er beim letzten Schlie&szlig;en der Seite war">&#8635; Stand vor dem Schlie&szlig;en</button>
+      </div>
+      <p class="mini" id="suInfo" style="margin-top:8px">Noch kein Setup gespeichert.</p>
+      <input type="file" id="suFile" accept=".json,application/json" style="display:none">
+    </article>
+    <details class="card">
+      <summary><h2 class="card-title"><span>&#9432; Was ein Setup enth&auml;lt</span></h2></summary>
+      <div class="hint2" id="hintSetups">Ein Setup ist der komplette Arbeitsstand: <b>Tempo, Swing, Humanize, Energy, Complexity, Loop, Infinity</b>,
+    <b>Tonart und Modus</b>, die <b>Progression samt Takt-Locks</b>, die komplette <b>Blues-Werkstatt</b> inklusive
+    Chorus-Bogen, alle f&uuml;nf <b>Lanes</b> mit Style, Kanal, Sound, Velocity, Density, Swing und Seed sowie die
+    <b>Export-</b> und <b>Cubase-Optionen</b>. Nicht gespeichert werden MIDI-Ports &ndash; die geh&ouml;ren zur Maschine,
+    nicht zum St&uuml;ck, und bleiben beim Rechnerwechsel korrekt.
+    <br><b>Cmd/Strg+S</b> speichert sofort unter dem Namen im Feld; ist es leer, wird ein Name aus Tonart, Tempo und Uhrzeit gebaut.</div>
+    </details>
+  </div>
+</section>
+
+<!-- ============ 7 · MONITOR ============ -->
+<section class="view view--monitor" id="viewMonitor" hidden>
+  <article class="card card--full">
+    <h2 class="card-title"><span>&#9636; Kanal-Belegung</span><span class="hint">Rahmenfarbe = Lane &middot; Aufblitzen = Note gesendet</span></h2>
+    <div class="chmon" id="chmon"></div>
+  </article>
+  <article class="card card--fill">
+    <h2 class="card-title"><span>&#128220; Protokoll</span></h2>
+    <div class="log-slot"></div>
+  </article>
+  <article class="card card--fill">
+    <h2 class="card-title"><span>&#9834; MIDI-Monitor</span>
+      <span class="hint">Nur wenn eingeschaltet</span></h2>
+    <div class="mlog" id="mlog"></div>
+  </article>
+</section>
+
+</main>
+
+<!-- ============================================================
+     KLAVIATUR-DOCK — auf allen Bereichen sichtbar
+     ============================================================ -->
+<footer class="piano-dock">
+  <div class="piano-bar">
+    <span class="hint">Klaviatur &middot; Farbe = Lane</span>
+    <span class="vis-chips" id="pianoChips" role="group" aria-label="Lanes in der Klaviatur"></span>
+    <span class="transport-spacer"></span>
+    <span class="hint">Tabulatur &middot; 8 Takte</span>
+    <span class="vis-chips" id="tabChips" role="group" aria-label="Lanes in der Tabulatur"></span>
+    <button class="vis-mode" id="tabModeTgl" aria-pressed="false" title="Tab-Modus: 8-Takte-Fenster oder synchron scrollen (laufender Takt in der Mitte)">&#9638; Fenster</button>
+    <button class="vis-mode" id="diaTgl" aria-pressed="true" title="Griffbilder &uuml;ber der Tabulatur ein-/ausblenden">&#119070; Griffe</button>
+    <button class="piano-toggle" aria-expanded="true">Einklappen</button>
+  </div>
+  <div class="dock-body">
+    <div class="piano-wrap"><div class="piano" id="piano"></div></div>
+    <div class="tab" id="tab" role="img" aria-label="Tabulatur des laufenden Takts"></div>
+  </div>
+</footer>
+
+</div><!-- /.app -->

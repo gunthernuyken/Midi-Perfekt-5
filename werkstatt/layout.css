@@ -1,0 +1,131 @@
+/* ============================================================
+   DICHTE-KORREKTUREN
+
+   Gemessen, nicht geschätzt: der Rundgang durch alle sieben Bereiche bei
+   1440x900 hat zwei Überläufe gezeigt — Song (+258 px) und Lanes (+108 px).
+   Genau die beiden, die schon in der Spezifikation als knapp markiert waren.
+   Hier stehen die Gegenmassnahmen, je mit dem Grund.
+   ============================================================ */
+
+/* --- Alles, was scrollen darf, scrollt in sich selbst -------------------
+   Ein Bereich darf nie die Seite verlängern. Wo Inhalt von aussen kommt
+   (Progression beliebiger Länge, Vorschlagslisten, Hilfetexte), rollt die
+   Karte, nicht das Fenster. */
+.view>.card,.view>.col>.card{min-block-size:0}
+.view>.col{min-block-size:0;display:flex;flex-direction:column;gap:var(--sp-3)}
+.card--fill{flex:1 1 auto;min-block-size:0;display:flex;flex-direction:column}
+.card--fill>.log,.card--fill>.mlog,.card--fill>.log-slot{flex:1 1 auto;min-block-size:0}
+.log-slot{display:flex;min-block-size:0}
+.log-slot>.log{flex:1 1 auto;min-block-size:0}
+.scroll-y{max-block-size:340px;overflow:auto;scrollbar-gutter:stable}
+
+/* --- Song -------------------------------------------------------------
+   Der Quintenzirkel war mit 286 px der grösste Einzelposten. 220 px reichen:
+   die Beschriftung bleibt lesbar, weil sie im SVG mitskaliert. */
+.view--song{grid-template-rows:auto auto minmax(0,1fr)}
+.view--song #cof svg{inline-size:168px;block-size:168px;display:block;margin-inline:auto}
+.view--song .cofwrap{justify-content:center}
+.view--song .card--bars .cdisp{max-block-size:148px;overflow:auto;scrollbar-gutter:stable;
+  padding-inline-end:var(--sp-1)}
+.view--song .sugrow{max-block-size:132px;overflow:auto;scrollbar-gutter:stable;align-content:flex-start}
+.view--song>.card:nth-child(3){overflow:auto}
+/* Suffix-Liste als Aufklapper, nicht als Dauerzeile */
+.sub-hint{margin-block-start:var(--sp-2)}
+.sub-hint>summary{cursor:pointer;font-size:var(--fs-sm);color:var(--c-text-mute);list-style:none;
+  display:inline-flex;align-items:center;gap:var(--sp-1)}
+.sub-hint>summary::before{content:'\25B8';color:var(--c-border-hi)}
+.sub-hint[open]>summary::before{content:'\25BE'}
+.sub-hint>summary::-webkit-details-marker{display:none}
+
+/* --- Lanes ------------------------------------------------------------
+   Zwei Etiketten brachen auf zwei Zeilen um ("Drum-Kit (Program Change)",
+   "Swing (gekoppelt)") und machten jede Lane 16 px höher als nötig. Sie
+   werden jetzt einzeilig gekürzt — der volle Text steht im title-Attribut
+   des Auswahlfeldes darunter. */
+.lane .field>label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  font-size:var(--fs-micro);letter-spacing:.04em}
+.lane{padding:var(--sp-2) var(--sp-4)}
+.lane-head{margin-block-end:var(--sp-2)}
+.lane .field{gap:2px}
+.lane select,.lane input[type=text]{block-size:28px}
+.view--lanes .card .row--end{align-items:flex-end}
+.view--lanes>.card:first-child{padding-block:var(--sp-3)}
+
+/* --- Seitenleiste: Kürzel ehrlich beschriften -------------------------
+   Die blanken Ziffern gehören weiterhin den Lanes. Bereiche liegen auf
+   Alt/Option — das steht auch so auf der Taste. */
+.rail-item kbd::before{content:'\2325'}
+.rail-keys{padding:0 var(--sp-4);font-size:var(--fs-micro);line-height:1.9;color:var(--c-text-mute)}
+.rail:has(.rail-toggle[aria-expanded="false"]) .rail-keys{display:none}
+
+/* --- Protokoll: Zeilen ohne Leerraum dazwischen ----------------------- */
+.log>div,.mlog>div{margin:0}
+.log{line-height:1.5}
+
+/* --- Setup-Liste als echte Liste, nicht als Klappfeld ----------------- */
+.su-list{block-size:auto;min-block-size:120px;padding:var(--sp-1);cursor:default}
+.su-list option{padding:3px var(--sp-2);border-radius:var(--r-1)}
+
+/* --- Kleinigkeiten ----------------------------------------------------- */
+.transport .rh{block-size:34px}
+.counter{display:flex;flex-direction:column;align-items:center;gap:1px}
+.stack{display:flex;flex-direction:column;gap:var(--sp-2);align-items:stretch}
+.stack>.rh{justify-content:center}
+.grow{flex:1 1 auto;min-inline-size:0}
+.mono{font-family:var(--ff-mono)}
+.nowrap{white-space:nowrap}
+details>summary{cursor:pointer;list-style:none}
+details>summary::-webkit-details-marker{display:none}
+details>summary .card-title{margin-block-end:0}
+details[open]>summary .card-title{margin-block-end:var(--sp-3)}
+
+/* --- Der Bereich darf nie höher werden als die Inhaltsfläche -----------
+   .view hatte min-block-size:100%. Das reicht nur, solange nichts wächst:
+   eine minmax(0,1fr)-Zeile bekommt ohne feste Aussenhöhe keine Obergrenze
+   und dehnt sich auf ihren Inhalt. Gemessen im Song-Bereich: 911 statt 744.
+   Mit block-size:100% ist die Höhe gedeckelt, und die Zeile verteilt, was
+   übrig ist. */
+.view{block-size:100%;min-block-size:0}
+.view--song>.card,.view--song>.col>.card{overflow:auto;scrollbar-gutter:stable}
+.view--song .cofwrap{align-items:flex-start}
+
+/* Generator und Reharmonisierung teilen sich eine Spalte; der Generator-Knopf
+   darf nicht als erstes abgeschnitten werden, wenn der Platz eng wird. */
+.view--song .cofinfo{font-size:var(--fs-micro);line-height:1.5}
+
+/* Song ist der dichteste Bereich. Die Karten dort bekommen weniger Innenluft,
+   damit der Quintenzirkel gross genug für lesbare Tonartnamen bleibt. */
+.view--song .card{gap:var(--sp-2);padding-block:var(--sp-2) var(--sp-3)}
+.view--song .card .row[style]{margin-top:0!important}
+.view--song .cofwrap{margin-block:auto}
+
+/* --- Knöpfe im Formularraster nicht auf Spaltenbreite ziehen -----------
+   Die zweite Rasterspalte ist minmax(0,1fr) — richtig für Auswahlfelder,
+   falsch für Knöpfe und Schalter: ein 400 px breiter Chip liest sich wie
+   ein Eingabefeld. */
+.form>.btn,.form>.rh,.form>.chip,.form>.tgl,.form>button{justify-self:start}
+.form>.row{justify-self:stretch}
+
+/* --- Karten wachsen mit ihrem Inhalt, nicht mit der Rasterzeile --------
+   In Blues und Sync stehen drei ungleich hohe Karten nebeneinander. Ohne
+   align-items:start dehnt die kürzeste sich auf die Höhe der längsten und
+   zeigt eine leere Fläche, die nach fehlendem Inhalt aussieht. */
+.view--blues,.view--sync{align-items:start;align-content:start}
+.view--blues .card--span2 .row{align-items:center}
+.view--blues select,.view--sync select{min-inline-size:96px}
+
+/* --- Mehrspaltige Formulare früher genug einspaltig ---------------------
+   Ein Paar aus Etikett (bis 152 px) und Feld (mind. 96 px) braucht zweimal
+   plus Abstände 427 px. Die Rückfallschwelle des Entwurfs lag bei 340 px —
+   in der 391 px schmalen Karte "Chorus-Bogen" legte sich dadurch das
+   Auswahlfeld über das Etikett daneben. */
+@container card (inline-size < 430px){
+  .form--2,.form--3,.form--4{--cols:1}
+}
+
+/* --- Aktiver Eintrag: nicht zusätzlich fett ----------------------------
+   Aktiv ist bereits über Fläche, Rahmen, Randmarke und Symbolfarbe
+   markiert. Die Fettung verbreiterte den Text von 111 auf 124 px und
+   kürzte damit ausgerechnet den Eintrag, auf dem man gerade steht. */
+.rail-item[aria-current="page"]{font-weight:500}
+:root{--w-rail:212px}

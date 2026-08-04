@@ -1,0 +1,1622 @@
+/* ============================================================================
+   MIDI PERFECT 3 — Visuelles System und Layout
+   Ein einzelner Stylesheet-Block, gedacht zum Einfügen in <style> der
+   Single-File-HTML. Keine Abhängigkeiten, keine externen Schriften.
+   Zielbrowser: Chrome/Edge (Web MIDI). Moderne CSS-Features ohne Fallback.
+
+   Aufbau
+     01 Tokens
+     02 Registrierte Eigenschaften
+     03 Grundlagen und Reset
+     04 App-Raster (Transport / Seitenleiste / Inhalt / Piano)
+     05 Transportleiste
+     06 Seitenleiste
+     07 Inhaltsbereich, Karten, Formularraster
+     08 Bedienelemente
+     09 Lane-Karte
+     10 Takt-Kacheln, Vorschläge, Quintenzirkel
+     11 Log, MIDI-Monitor, Kanal-Belegung
+     12 Piano-Dock
+     13 Hilfsklassen
+     14 Bewegung reduzieren
+   ========================================================================== */
+
+/* ============================================================================
+   01 TOKENS
+   Alle Werte, die mehr als einmal vorkommen, stehen hier. Nichts im Rest der
+   Datei greift auf rohe Hex-Werte zu — Ausnahme: die Lane-Identitätsfarben
+   werden zusätzlich pro Lane über --lane gesetzt.
+   ========================================================================== */
+:root {
+  color-scheme: dark;
+
+  /* --- Flächen -------------------------------------------------------------
+     Vier Ebenen, absichtlich flach gehalten: je tiefer die Fläche liegt,
+     desto dunkler. Der Inhaltsbereich ist die HELLSTE grosse Fläche nicht —
+     die Karten sind es. Das lenkt den Blick auf die Bedienelemente. */
+  --c-app:        #0a0e14;   /* Fensterfläche hinter dem Inhalt              */
+  --c-rail:       #0d0d1a;   /* Transportleiste, Seitenleiste, Piano-Dock    */
+  --c-panel:      #131326;   /* Karten                                       */
+  --c-panel-2:    #0f1a30;   /* verschachtelte Blöcke, Lane-Karten           */
+  --c-sunken:     #070b16;   /* Log, Monitor — tiefer als alles andere       */
+  --c-field:      #0f3460;   /* Füllung von select/input                     */
+  --c-field-hi:   #14417a;   /* Füllung im Hover                             */
+
+  /* --- Rahmen --------------------------------------------------------------
+     KORREKTUR gegenüber MIDI PERFECT 2: der Bestandsrahmen #1a4a8a erreicht
+     gegen die Kartenfläche nur 2.08:1 und verfehlt damit WCAG 1.4.11 (3:1 für
+     die Grenze eines Bedienelements). #1a4a8a bleibt als rein dekorative
+     Trennlinie erhalten; jede Grenze, die ein Bedienelement identifiziert,
+     nutzt --c-border-ctl (#4a7fc4 = 4.46:1 gegen Karte, 3.05:1 gegen die
+     Feldfüllung). */
+  --c-border:      #1a4a8a;  /* dekorativ, trennt ohne zu bedeuten           */
+  --c-border-soft: #0f3460;  /* Kartenkante, Abschnittslinien                */
+  --c-border-ctl:  #4a7fc4;  /* Grenze aller Bedienelemente — 3:1 geprüft    */
+  --c-border-hi:   #6f9fdb;  /* Hover-Grenze                                 */
+
+  /* --- Text ----------------------------------------------------------------
+     KORREKTUR: die Bestandswerte #5a5a72 (1.87:1) und #6b7796 (3.95:1) sind
+     unlesbar bzw. grenzwertig. Die Skala hat nur noch drei Stufen, die
+     unterste liegt bei 4.98:1 auf der hellsten Fläche. */
+  --c-text:        #e6e9f2;  /* 11.9:1 auf Karte                             */
+  --c-text-dim:    #b6c0d8;  /* 9.4:1  — Zweitrangiges, Hilfetext            */
+  --c-text-mute:   #9aa3c0;  /* 7.3:1 auf Karte, 4.98:1 auf Feldfüllung      */
+  --c-text-on-accent: #04121b; /* Text auf gefüllten Akzentflächen           */
+  --c-text-disabled: #6f7a94;
+
+  /* --- Akzent und Semantik ------------------------------------------------- */
+  --c-accent:      #00d4ff;  /* Cyan, Leitfarbe                              */
+  --c-accent-dim:  #0e6fa8;  /* Cyan gedeckt, für Verläufe                   */
+  --c-accent-wash: color-mix(in srgb, var(--c-accent) 14%, transparent);
+  --c-violet:      #a855f7;  /* Sekundär-Akzent (Mutation, Reharmonisierung) */
+  --c-violet-text: #c9a6ff;  /* 9.0:1 — Violett als Schriftfarbe             */
+  --c-violet-solid:#7c3aed;  /* gefüllte Fläche, Weiss darauf 5.70:1         */
+  --c-ok:          #3ad9a0;
+  --c-ok-solid:    #16794f;  /* Weiss darauf 5.41:1                          */
+  --c-warn:        #ffcc00;
+  --c-err:         #ff5c6a;  /* KORREKTUR: #ff4455 als Schrift nur 5.41:1 —  */
+                             /* als Schrift ok, aber #ff5c6a liest sich auf  */
+                             /* der Feldfüllung noch mit 4.16:1              */
+  --c-err-solid:   #c81e33;  /* Weiss darauf 5.69:1 (statt #ff4455 = 3.38:1) */
+
+  /* --- Lane-Identität (FIX, trägt Bedeutung, nie ändern) ------------------- */
+  --lane-drums:  #ff44aa;
+  --lane-bass:   #ff6622;
+  --lane-chords: #4488ff;
+  --lane-arp:    #22cc88;
+  --lane-melody: #ffcc00;
+
+  /* --- Fokus ---------------------------------------------------------------
+     Zweifarbiger Ring: innen ein dunkler Trennring, aussen Hellcyan. So bleibt
+     der Ring sowohl auf der dunklen Karte als auch auf einer cyanfarbenen
+     Knopffläche sichtbar. Fokus wird NIE nur über Farbe angezeigt. */
+  --c-focus:      #8ee9ff;
+  --c-focus-halo: #04121b;
+  --focus-w:      2px;
+
+  /* --- Abstände (4er-Skala, zwei Zwischenschritte für Dichte) -------------- */
+  --sp-0:  2px;
+  --sp-1:  4px;
+  --sp-2:  6px;
+  --sp-3:  8px;
+  --sp-4: 12px;
+  --sp-5: 16px;
+  --sp-6: 20px;
+  --sp-7: 24px;
+  --sp-8: 32px;
+
+  /* --- Radien -------------------------------------------------------------- */
+  --r-1: 4px;
+  --r-2: 6px;
+  --r-3: 8px;
+  --r-4: 12px;
+  --r-pill: 999px;
+
+  /* --- Schrift -------------------------------------------------------------
+     Systemstapel, keine Webfonts. Zahlen überall tabellarisch, damit der
+     Takt-Zähler und die Reglerwerte nicht springen. */
+  --ff: system-ui, "Segoe UI", -apple-system, Roboto, Arial, sans-serif;
+  --ff-mono: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+
+  --fs-micro: 0.625rem;   /* 10px — nur Zahlen und <kbd>, nie Fliesstext     */
+  --fs-tiny:  0.6875rem;  /* 11px — Feld-Etiketten in Grossbuchstaben        */
+  --fs-sm:    0.75rem;    /* 12px — Hilfetext, Log                          */
+  --fs-md:    0.8125rem;  /* 13px — Standard für Bedienelemente             */
+  --fs-base:  0.875rem;   /* 14px — Fliesstext                              */
+  --fs-lg:    1rem;
+  --fs-xl:    1.25rem;
+  --fs-ctr:   1.75rem;    /* Takt-Zähler                                    */
+
+  --lh-tight: 1.2;
+  --lh-base:  1.5;
+
+  /* --- Schatten ------------------------------------------------------------
+     Kein Leuchten als Standard. Das Bestandsdesign legte auf jede Karte einen
+     cyanfarbenen Glow — bei sieben Bereichen erzeugt das Unruhe. Glow bleibt
+     dem aktiven Zustand und dem Transport vorbehalten. */
+  --sh-1: 0 1px 2px rgb(0 0 0 / .45);
+  --sh-2: 0 4px 14px rgb(0 0 0 / .45);
+  --sh-3: 0 12px 34px rgb(0 0 0 / .6);
+  --glow-accent: 0 0 12px color-mix(in srgb, var(--c-accent) 45%, transparent);
+  --glow-lane:   0 0 10px color-mix(in srgb, var(--lane, var(--c-accent)) 55%, transparent);
+
+  /* --- Bewegung ------------------------------------------------------------ */
+  --t-fast: 90ms;
+  --t-base: 150ms;
+  --t-slow: 240ms;
+  --ease: cubic-bezier(.4, 0, .2, 1);
+
+  /* --- Layout-Masse --------------------------------------------------------
+     Höhenbudget bei 1440x900 (Vollbild):
+       900 - 52 (Transport) - 104 (Piano) = 744px für den Inhalt,
+       abzüglich 2x14px Polsterung = 716px netto.
+     Im Fenstermodus (~790px Viewport) bleiben 606px; das Piano lässt sich
+     dann auf 30px einklappen und man ist wieder bei 680px. */
+  --h-transport:   52px;
+  --w-rail:       200px;
+  --w-rail-min:    56px;
+  --h-piano:      232px;
+  --h-piano-min:   30px;
+  --pad-content:   14px;
+
+  --h-ctl:      32px;   /* Mindest-Klickziel, gilt für ALLE Bedienelemente   */
+  --h-ctl-lg:   38px;   /* Transport-Hauptknöpfe                            */
+  --thumb:      18px;   /* Reglergriff, Vorgabe war mindestens 16px         */
+  --track:       6px;
+
+  /* Breite der Etikettenspalte im Formularraster. Englische Beschriftungen
+     sind rund 20% länger — statt eines festen Wertes deckelt fit-content()
+     die Spalte, sodass lange Etiketten umbrechen statt das Raster zu sprengen. */
+  --label-max: 9.5rem;
+}
+
+/* Englisch: mehr Deckel für die Etikettenspalte, gleiche Rasterstruktur.
+   Wird über <html lang="en"> oder [data-lang="en"] geschaltet. */
+:root:lang(en),
+:root[data-lang="en"] { --label-max: 11.5rem; }
+
+/* Dichtemodus als Design-Token höherer Ordnung. Container-Stilabfragen weiter
+   unten reagieren darauf, ohne dass Markup-Klassen nötig sind. */
+:root { --density: kompakt; }
+
+/* ============================================================================
+   02 REGISTRIERTE EIGENSCHAFTEN
+   --lane und --fill müssen typisiert sein, damit sie animierbar bzw. in
+   Verläufen interpolierbar sind.
+   ========================================================================== */
+@property --lane {
+  syntax: "<color>"; inherits: true; initial-value: #00d4ff;
+}
+@property --fill {
+  syntax: "<percentage>"; inherits: false; initial-value: 0%;
+}
+
+/* ============================================================================
+   03 GRUNDLAGEN
+   ========================================================================== */
+*, *::before, *::after { box-sizing: border-box; }
+
+/* interpolate-size erlaubt Übergänge auf height:auto — genutzt vom Piano-Dock
+   und von einklappbaren Karten. */
+html { interpolate-size: allow-keywords; }
+
+html, body { block-size: 100%; }
+
+body {
+  margin: 0;
+  background: var(--c-app);
+  color: var(--c-text);
+  font-family: var(--ff);
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+  font-variant-numeric: tabular-nums;
+  accent-color: var(--c-accent);
+  overflow: clip;              /* Die Seite selbst scrollt nie. */
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Bündigere Etiketten ohne Zeilenkasten-Überhang; spart in dichten Rastern
+   pro Zeile rund 2px. Nur wo unterstützt. */
+@supports (text-box: trim-both cap alphabetic) {
+  .lbl, .card-title, .rail-item, .chip, .btn { text-box: trim-both cap alphabetic; }
+}
+
+::selection { background: color-mix(in srgb, var(--c-accent) 35%, transparent); }
+
+/* Rollbalken sind Teil des Themas, nicht des Betriebssystems. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-border-ctl) transparent;
+}
+
+kbd {
+  font-family: var(--ff-mono);
+  font-size: var(--fs-micro);
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: var(--r-1);
+  background: #152442;
+  border: 1px solid var(--c-border);
+  border-block-end-width: 2px;
+  color: var(--c-text-mute);   /* 6.14:1 */
+  white-space: nowrap;
+}
+
+/* --- Fokus, global -------------------------------------------------------
+   :focus-visible statt :focus, damit Mausklicks keinen Ring hinterlassen.
+   Der Ring ist eine Kontur PLUS ein dunkler Innenring — er trägt für sich
+   allein, unabhängig von Farbwahrnehmung. */
+:where(a, button, select, input, textarea, summary, [tabindex]):focus-visible,
+.chip:focus-visible,
+.rail-item:focus-visible {
+  outline: var(--focus-w) solid var(--c-focus);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--c-focus-halo);
+  z-index: 3;                  /* Ring niemals von Nachbarn überdeckt. */
+}
+/* Tastaturfokus im Inhalt darf nicht am Rand kleben. */
+.content { scroll-padding: var(--sp-6); }
+
+/* ============================================================================
+   04 APP-RASTER
+   Zwei Spalten, drei Zeilen. Transport und Piano spannen über beide Spalten,
+   damit Transport und Klaviatur unabhängig vom Bereich stehen bleiben.
+
+     +----------------------------------------------+  52px
+     |               transport                      |
+     +--------+-------------------------------------+
+     | rail   |            content                  |  1fr
+     |        |                                     |
+     +--------+-------------------------------------+
+     |               piano                          |  104px
+     +----------------------------------------------+
+   ========================================================================== */
+.app {
+  display: grid;
+  block-size: 100dvb;
+  grid-template-columns: var(--w-rail) minmax(0, 1fr);
+  grid-template-rows: var(--h-transport) minmax(0, 1fr) auto;
+  grid-template-areas:
+    "transport transport"
+    "rail      content"
+    "piano     piano";
+  transition: grid-template-columns var(--t-slow) var(--ease);
+}
+/* Seitenleiste eingeklappt: nur noch Symbole. :has() spart eine Klasse am
+   Wurzelelement — der Zustand lebt am Schalter, wo er hingehört. */
+.app:has(.rail-toggle[aria-expanded="false"]) { --w-rail: var(--w-rail-min); }
+
+.transport { grid-area: transport; }
+.rail      { grid-area: rail; }
+.content   { grid-area: content; }
+.piano-dock{ grid-area: piano; }
+
+/* ============================================================================
+   05 TRANSPORTLEISTE
+   Steht immer. Enthält nur, was beim Spielen im Blick bleiben muss:
+   Play/Stop/Reroll, Takt-Zähler, vier Beat-Punkte, fünf Lane-Kürzel,
+   Sprachumschalter. Alles Weitere gehört in den Inhalt.
+   ========================================================================== */
+.transport {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding-inline: var(--sp-4);
+  background: var(--c-rail);
+  border-block-end: 1px solid var(--c-border-soft);
+  box-shadow: var(--sh-2);
+  position: relative;
+  z-index: 40;
+}
+/* Läuft die Wiedergabe, bekommt die Leiste eine cyanfarbene Oberkante —
+   peripher wahrnehmbar, ohne dass man hinsehen muss. */
+.transport::after {
+  content: "";
+  position: absolute; inset-inline: 0; inset-block-start: 0;
+  block-size: 2px;
+  background: var(--c-accent);
+  box-shadow: var(--glow-accent);
+  opacity: 0;
+  transition: opacity var(--t-base) var(--ease);
+}
+.app[data-playing="true"] .transport::after { opacity: 1; }
+
+.transport-sep {
+  inline-size: 1px; block-size: 24px;
+  background: var(--c-border-soft);
+  flex: none;
+}
+.transport-spacer { flex: 1 1 auto; min-inline-size: var(--sp-3); }
+
+/* --- Takt-Zähler ---------------------------------------------------------- */
+.counter {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  min-inline-size: 6.5ch;          /* ch statt px: hält bei "128.4" die Breite */
+  padding-inline: var(--sp-2);
+  line-height: 1;
+}
+.counter-bar {
+  font-size: var(--fs-ctr);
+  font-weight: 700;
+  color: var(--c-accent);
+  letter-spacing: .02em;
+  text-shadow: 0 0 14px color-mix(in srgb, var(--c-accent) 50%, transparent);
+}
+.counter-sub {
+  font-size: var(--fs-micro);
+  color: var(--c-text-mute);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+/* --- Beat-Punkte ---------------------------------------------------------- */
+.beats { display: flex; gap: var(--sp-2); flex: none; }
+.beat {
+  inline-size: 12px; block-size: 12px;
+  border-radius: 50%;
+  background: transparent;
+  border: 2px solid var(--c-border-ctl);   /* 4.7:1 gegen die Leiste */
+  transition: background var(--t-fast) linear, box-shadow var(--t-fast) linear;
+}
+.beat.is-on {
+  background: var(--c-accent);
+  border-color: var(--c-accent);
+  box-shadow: var(--glow-accent);
+}
+/* Die Eins ist grösser — die Taktgrenze erkennt man so aus dem Augenwinkel. */
+.beat:first-child { inline-size: 14px; block-size: 14px; }
+
+/* --- Lane-Kürzel ---------------------------------------------------------- */
+.transport-lanes { display: flex; gap: var(--sp-1); flex: none; }
+.lane-key {
+  --lane: var(--c-accent);
+  display: inline-flex; align-items: center; gap: var(--sp-1);
+  block-size: var(--h-ctl);
+  padding-inline: var(--sp-3);
+  border-radius: var(--r-2);
+  background: var(--c-panel-2);
+  border: 1px solid var(--c-border-ctl);
+  color: var(--c-text-dim);
+  font: 600 var(--fs-tiny)/1 var(--ff);
+  letter-spacing: .08em;
+  cursor: pointer;
+  transition: border-color var(--t-base) var(--ease),
+              color var(--t-base) var(--ease),
+              background var(--t-base) var(--ease);
+}
+.lane-key::before {                       /* Zustandspunkt */
+  content: "";
+  inline-size: 8px; block-size: 8px; border-radius: 50%;
+  background: var(--c-border-ctl);
+  transition: background var(--t-base) var(--ease), box-shadow var(--t-base) var(--ease);
+}
+.lane-key:hover { border-color: var(--lane); color: var(--c-text); }
+.lane-key[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--lane) 16%, var(--c-panel-2));
+  border-color: var(--lane);
+  color: var(--c-text);
+}
+.lane-key[aria-pressed="true"]::before {
+  background: var(--lane);
+  box-shadow: var(--glow-lane);
+}
+.lane-key kbd { margin-inline-start: var(--sp-1); }
+
+/* --- Sprachumschalter ----------------------------------------------------- */
+.lang-toggle {
+  display: inline-flex; align-items: center;
+  block-size: var(--h-ctl);
+  padding-inline: var(--sp-3);
+  border-radius: var(--r-2);
+  background: transparent;
+  border: 1px solid var(--c-border-ctl);
+  color: var(--c-text-dim);
+  font: 600 var(--fs-tiny)/1 var(--ff);
+  letter-spacing: .1em;
+  cursor: pointer;
+}
+.lang-toggle b { color: var(--c-accent); font-weight: 700; }
+.lang-toggle:hover { border-color: var(--c-border-hi); color: var(--c-text); }
+
+/* ============================================================================
+   06 SEITENLEISTE
+   Sieben Bereiche, feste Reihenfolge, Ziffer 1-7 als Kürzel. Der aktive
+   Eintrag wird über DREI Merkmale markiert: Farbe, Füllung und eine
+   Randmarke — nicht über Farbe allein.
+   ========================================================================== */
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-3) var(--sp-2);
+  background: var(--c-rail);
+  border-inline-end: 1px solid var(--c-border-soft);
+  overflow: clip;
+  container-type: inline-size;
+  z-index: 30;
+}
+.rail-brand {
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-2) var(--sp-4);
+  color: var(--c-accent);
+  font: 700 var(--fs-md)/1 var(--ff);
+  letter-spacing: .14em;
+  white-space: nowrap;
+}
+.rail-brand small {
+  display: block;
+  font: 400 var(--fs-micro)/1.4 var(--ff-mono);
+  letter-spacing: 0;
+  color: var(--c-text-mute);
+}
+
+.rail-item {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-3);
+  min-block-size: 38px;
+  padding-inline: var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-3);
+  background: none;
+  color: var(--c-text-dim);
+  font: 500 var(--fs-md)/1.15 var(--ff);
+  text-align: start;
+  cursor: pointer;
+  position: relative;
+  transition: background var(--t-base) var(--ease),
+              color var(--t-base) var(--ease),
+              border-color var(--t-base) var(--ease);
+}
+.rail-item .ico {
+  font-size: var(--fs-lg);
+  line-height: 1;
+  text-align: center;
+  color: var(--c-text-mute);
+  transition: color var(--t-base) var(--ease);
+}
+.rail-item .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail-item kbd { opacity: .8; }
+
+.rail-item:hover {
+  background: color-mix(in srgb, var(--c-accent) 8%, transparent);
+  color: var(--c-text);
+  border-color: var(--c-border-soft);
+}
+.rail-item:hover .ico { color: var(--c-text-dim); }
+
+.rail-item[aria-current="page"] {
+  background: color-mix(in srgb, var(--c-accent) 15%, var(--c-panel));
+  border-color: color-mix(in srgb, var(--c-accent) 55%, transparent);
+  color: var(--c-text);
+  font-weight: 600;
+}
+.rail-item[aria-current="page"] .ico { color: var(--c-accent); }
+/* Randmarke: zweites, farbunabhängiges Merkmal des aktiven Zustands. */
+.rail-item[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  inset-block: 6px;
+  inset-inline-start: calc(var(--sp-2) * -1);
+  inline-size: 3px;
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+  background: var(--c-accent);
+  box-shadow: var(--glow-accent);
+}
+
+/* Der Bereich mit ungespeicherten/aktiven Sonderzuständen bekommt einen Punkt
+   (z.B. Infinity läuft, Clock sendet). Attribut statt Klasse. */
+.rail-item[data-flag]::after {
+  content: "";
+  inline-size: 6px; block-size: 6px; border-radius: 50%;
+  background: var(--c-violet);
+  justify-self: end;
+}
+.rail-item[data-flag="ok"]::after   { background: var(--c-ok); }
+.rail-item[data-flag="warn"]::after { background: var(--c-warn); }
+.rail-item[data-flag="err"]::after  { background: var(--c-err); }
+
+.rail-spacer { flex: 1 1 auto; }
+
+.rail-toggle {
+  display: flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  min-block-size: var(--h-ctl);
+  border: 1px solid var(--c-border-soft);
+  border-radius: var(--r-3);
+  background: none;
+  color: var(--c-text-mute);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.rail-toggle:hover { color: var(--c-text); border-color: var(--c-border-ctl); }
+
+/* Eingeklappt: Container-Abfrage statt Klassenkaskade. Unter 96px Breite
+   verschwinden Beschriftung und Kürzel, das Symbol zentriert sich. */
+@container (inline-size < 96px) {
+  .rail-item { grid-template-columns: 1fr; justify-items: center; padding-inline: 0; }
+  .rail-item .label, .rail-item kbd { display: none; }
+  .rail-brand { justify-content: center; }
+  .rail-brand span, .rail-brand small { display: none; }
+  .rail-toggle .label { display: none; }
+}
+
+/* Beschriftung als angeheftete Sprechblase, wenn die Leiste eingeklappt ist.
+   Anchor Positioning erspart die Berechnung in JS. */
+/* anchor-scope begrenzt den Namen auf den jeweiligen Eintrag — ohne das
+   würden alle Sprechblasen am letzten Eintrag hängen. */
+.rail-item { anchor-name: --rail-anchor; anchor-scope: --rail-anchor; }
+.rail-item .tip {
+  position: fixed;
+  position-anchor: --rail-anchor;
+  position-area: inline-end center;
+  margin-inline-start: var(--sp-2);
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--r-2);
+  background: var(--c-panel);
+  border: 1px solid var(--c-border-ctl);
+  box-shadow: var(--sh-3);
+  color: var(--c-text);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  opacity: 0; pointer-events: none;
+  transition: opacity var(--t-fast) var(--ease);
+}
+@container (inline-size < 96px) {
+  .rail-item:hover .tip, .rail-item:focus-visible .tip { opacity: 1; }
+}
+
+/* ============================================================================
+   07 INHALTSBEREICH, KARTEN, FORMULARRASTER
+   Genau ein Bereich ist sichtbar. Der Inhalt scrollt nur im Notfall — die
+   Bereichslayouts sind so gerechnet, dass sie in 716px Höhe passen.
+   ========================================================================== */
+.content {
+  padding: var(--pad-content) var(--sp-5);
+  overflow: hidden auto;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+  background: var(--c-app);
+  position: relative;
+}
+/* Bereiche werden über [hidden] geschaltet, nicht über display-Klassen —
+   dann greifen auch Suchfunktion und Fokusreihenfolge korrekt. */
+.view[hidden] { display: none; }
+.view {
+  display: grid;
+  gap: var(--sp-4);
+  align-content: start;
+  min-block-size: 100%;
+  animation: view-in var(--t-slow) var(--ease);
+}
+@keyframes view-in { from { opacity: 0; translate: 0 6px; } }
+
+/* Bereichslayouts. Spaltenzahlen sind auf 1212px netto Inhaltsbreite
+   gerechnet — Begründung steht in SPEC.md. */
+.view--midi   { grid-template-columns: 7fr 5fr; }
+/* Song: erste Spalte fest für den Quintenzirkel, dahinter zwei gleiche
+   Spalten. Akkordzeile und Takt-Kacheln spannen mit .card--full über alle
+   drei — sonst passt der Bereich bei 32 Takten nicht in 716px. */
+.view--song   { grid-template-columns: 300px repeat(2, minmax(0, 1fr)); }
+.view--blues  { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.view--lanes  { grid-template-columns: minmax(0, 1fr); gap: var(--sp-3); }
+.view--sync   { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.view--export { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* Monitor: Kopfzeile fest, darunter zwei gleich hohe Protokollflächen, die
+   den Rest ausfüllen. minmax(0,1fr) ist Pflicht, sonst wachsen sie über den
+   Container hinaus. */
+.view--monitor {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: auto minmax(0, 1fr);
+  block-size: 100%;
+}
+
+/* --- Karte ---------------------------------------------------------------- */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-inline-size: 0;
+  min-block-size: 0;
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  background: var(--c-panel);
+  border: 1px solid var(--c-border-soft);
+  border-radius: var(--r-4);
+  box-shadow: var(--sh-1);
+  container: card / inline-size;
+}
+/* Spalte aus mehreren Karten innerhalb eines Bereichs. Direktes Kind von
+   .view, damit die Rasterspalten des Bereichs erhalten bleiben. */
+.col {
+  display: grid;
+  gap: var(--sp-4);
+  align-content: start;
+  min-inline-size: 0;
+  min-block-size: 0;
+}
+.col--fill { grid-template-rows: auto auto minmax(0, 1fr); align-content: stretch; }
+
+.card--flush { padding: 0; overflow: clip; }
+.card--fill  { min-block-size: 0; }          /* füllt die Rasterzeile        */
+.card--span2 { grid-column: span 2; }
+.card--span3 { grid-column: span 3; }
+.card--full  { grid-column: 1 / -1; }
+
+.card-title {
+  display: flex; align-items: baseline; gap: var(--sp-3);
+  padding-block-end: var(--sp-2);
+  border-block-end: 1px solid var(--c-border-soft);
+  color: var(--c-accent);
+  font: 700 var(--fs-tiny)/1.3 var(--ff);
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+.card-title .hint {
+  margin-inline-start: auto;
+  color: var(--c-text-mute);
+  font: 400 var(--fs-sm)/1.3 var(--ff);
+  letter-spacing: 0;
+  text-transform: none;
+  text-align: end;
+}
+/* Einklappbare Karte über <details>. Der Pfeil ist ein Unicode-Zeichen, kein
+   Emoji und kein Bild. */
+details.card > summary { list-style: none; cursor: pointer; }
+details.card > summary::-webkit-details-marker { display: none; }
+details.card > summary .card-title::after {
+  content: "\25BE"; margin-inline-start: var(--sp-2);
+  color: var(--c-border-ctl); font-size: var(--fs-sm);
+}
+details.card:not([open]) > summary .card-title { border-block-end: none; padding-block-end: 0; }
+details.card:not([open]) > summary .card-title::after { content: "\25B8"; }
+
+/* Abschnittsüberschrift innerhalb einer Karte — leichter als ein Kartentitel. */
+.section-head {
+  display: flex; align-items: center; gap: var(--sp-2);
+  margin-block-start: var(--sp-1);
+  color: var(--c-text-dim);
+  font: 600 var(--fs-tiny)/1.3 var(--ff);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.section-head::after {
+  content: ""; flex: 1 1 auto; block-size: 1px;
+  background: var(--c-border-soft);
+}
+
+/* --- Formularraster -------------------------------------------------------
+   Etikett und Bedienelement stehen NEBENEINANDER, nicht übereinander. Das
+   spart pro Paar rund 17px Höhe — bei 14 Paaren eine ganze Kartenhöhe.
+   Die Etikettenspalte ist inhaltsabhängig, aber gedeckelt: lange englische
+   Beschriftungen brechen um, statt das Raster zu verschieben.               */
+.form {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 1),
+                          fit-content(var(--label-max)) minmax(0, 1fr));
+  align-items: center;
+  column-gap: var(--sp-3);
+  row-gap: var(--sp-2);
+}
+.form--2 { --cols: 2; }
+.form--3 { --cols: 3; }
+.form--4 { --cols: 4; }
+/* Spaltenabstand zwischen Paaren grösser als zwischen Etikett und Element,
+   damit die Zuordnung eindeutig bleibt. */
+.form--2, .form--3, .form--4 { column-gap: var(--sp-3); }
+/* Jedes zweite Kind ist ein Bedienelement. Alle ausser dem letzten bekommen
+   einen zusätzlichen Rechtsabstand — so ist der Abstand ZWISCHEN zwei Paaren
+   grösser als der zwischen Etikett und Element und die Zuordnung bleibt
+   eindeutig, ohne dass ein Wrapper-Element nötig wäre. */
+.form--2 > *:nth-child(2n):not(:last-child),
+.form--3 > *:nth-child(2n):not(:last-child),
+.form--4 > *:nth-child(2n):not(:last-child) { margin-inline-end: var(--sp-4); }
+
+.lbl {
+  color: var(--c-text-mute);
+  font: 600 var(--fs-tiny)/1.25 var(--ff);
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  text-wrap: balance;
+  justify-self: start;
+}
+.lbl[data-required]::after { content: "\00A0*"; color: var(--c-warn); }
+
+/* Ein Paar, das über die volle Rasterbreite geht (z.B. die Akkordzeile). */
+.form > .span-all { grid-column: 2 / -1; }
+.form > .row-all  { grid-column: 1 / -1; }
+
+/* Stapelvariante für Fälle, in denen das Etikett zwingend über dem Element
+   stehen muss (sehr breite Felder, Textbereiche). */
+.field {
+  display: grid; gap: var(--sp-1); min-inline-size: 0;
+}
+.field > .lbl { justify-self: start; }
+
+/* Zeile aus gleichrangigen Elementen ohne Etiketten (Knopfgruppen). */
+.row {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: var(--sp-2);
+}
+.row--end { justify-content: flex-end; }
+.row--tight { gap: var(--sp-1); }
+
+/* Hilfetext. Immer --c-text-mute oder heller, nie kleiner als 12px. */
+.hint {
+  color: var(--c-text-mute);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+.hint b { color: var(--c-text-dim); font-weight: 600; }
+.hint--warn { color: var(--c-warn); }
+.hint--ok   { color: var(--c-ok); }
+.hint--err  { color: var(--c-err); }
+
+/* Karte reagiert auf ihre eigene Breite: wird sie schmal (z.B. Seitenleiste
+   aufgeklappt plus dreispaltiger Bereich), fällt das Formular auf eine
+   Spalte zurück, statt Etiketten zu quetschen. */
+@container card (inline-size < 340px) {
+  .form--2, .form--3, .form--4 { --cols: 1; }
+}
+@container card (inline-size < 240px) {
+  .form { grid-template-columns: minmax(0, 1fr); }
+  .form > .lbl { grid-column: 1; }
+}
+
+/* ============================================================================
+   08 BEDIENELEMENTE
+   ========================================================================== */
+
+/* --- select / input ------------------------------------------------------- */
+select,
+input[type="text"],
+input[type="number"],
+input[type="search"] {
+  min-block-size: var(--h-ctl);
+  inline-size: 100%;
+  min-inline-size: 0;
+  padding-inline: var(--sp-3);
+  padding-block: 0;
+  border: 1px solid var(--c-border-ctl);
+  border-radius: var(--r-2);
+  background: var(--c-field);
+  color: var(--c-text);
+  font: 400 var(--fs-md)/1 var(--ff);
+  transition: border-color var(--t-base) var(--ease),
+              background var(--t-base) var(--ease);
+}
+select {
+  appearance: none;
+  padding-inline-end: calc(var(--sp-3) + 14px);
+  cursor: pointer;
+  /* Unicode-Pfeil als Hintergrundzeichnung, kein Bild, kein Emoji. */
+  background-image: linear-gradient(45deg, transparent 50%, var(--c-text-dim) 50%),
+                    linear-gradient(135deg, var(--c-text-dim) 50%, transparent 50%);
+  background-position: right 14px center, right 9px center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+select:hover,
+input[type="text"]:hover,
+input[type="number"]:hover { background-color: var(--c-field-hi); border-color: var(--c-border-hi); }
+select:focus-visible,
+input:focus-visible { border-color: var(--c-accent); }
+
+input[type="text"], input[type="number"] { cursor: text; }
+input::placeholder { color: var(--c-text-mute); opacity: 1; }
+
+/* Zahlenfelder: schmal, rechtsbündig, ohne Spinner-Sprünge im Layout. */
+input[type="number"] { text-align: end; }
+.num-sm { inline-size: 5.5ch; }
+.num-md { inline-size: 8ch; }
+
+/* Monospace-Eingabe für die Akkordzeile — Zeichenbreite = Taktraster. */
+.input-mono {
+  font-family: var(--ff-mono);
+  font-size: var(--fs-base);
+  letter-spacing: .06em;
+  min-block-size: var(--h-ctl-lg);
+}
+
+/* Ungültige Eingabe erst NACH Interaktion melden. */
+input:user-invalid { border-color: var(--c-err); }
+.form:has(input:user-invalid) .error-note { display: block; }
+.error-note { display: none; color: var(--c-err); font-size: var(--fs-sm); }
+
+:disabled,
+[aria-disabled="true"] {
+  opacity: .45;
+  cursor: not-allowed;
+  filter: saturate(.5);
+}
+select:disabled, input:disabled { background: var(--c-panel-2); color: var(--c-text-disabled); }
+
+/* --- Regler ---------------------------------------------------------------
+   Vollständig eigengezeichnet, weil accent-color weder Bahnhöhe noch
+   Griffgrösse steuert. Der gefüllte Anteil kommt aus --fill; JS setzt
+   el.style.setProperty('--fill', pct + '%') im input-Ereignis.            */
+.slider {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-2);
+  min-inline-size: 0;
+}
+input[type="range"] {
+  appearance: none;
+  inline-size: 100%;
+  min-inline-size: 60px;
+  block-size: var(--h-ctl);      /* Klickziel bleibt 32px hoch, sichtbare  */
+  background: transparent;        /* Bahn ist schlanker.                    */
+  cursor: pointer;
+  margin: 0;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  block-size: var(--track);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--c-border-ctl);   /* 3:1-Grenze der Bahn */
+  background:
+    linear-gradient(90deg,
+      var(--c-accent) 0 var(--fill),
+      color-mix(in srgb, var(--c-border-ctl) 40%, var(--c-sunken)) var(--fill) 100%);
+}
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  inline-size: var(--thumb); block-size: var(--thumb);
+  margin-block-start: calc((var(--track) - var(--thumb)) / 2 - 1px);
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffffff 0%, var(--c-accent) 55%, var(--c-accent-dim) 100%);
+  border: 1px solid var(--c-focus-halo);
+  box-shadow: var(--sh-1);
+  transition: scale var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
+}
+input[type="range"]:hover::-webkit-slider-thumb { scale: 1.12; box-shadow: var(--glow-accent); }
+input[type="range"]:active::-webkit-slider-thumb { scale: 1.2; }
+input[type="range"]:disabled::-webkit-slider-thumb { background: var(--c-text-disabled); }
+
+/* Regler in Lane-Farbe: --lane wird auf der Lane-Karte gesetzt und vererbt. */
+.lane-card input[type="range"]::-webkit-slider-runnable-track {
+  background:
+    linear-gradient(90deg,
+      var(--lane) 0 var(--fill),
+      color-mix(in srgb, var(--c-border-ctl) 40%, var(--c-sunken)) var(--fill) 100%);
+}
+.lane-card input[type="range"]::-webkit-slider-thumb {
+  background: linear-gradient(180deg, #ffffff 0%, var(--lane) 60%,
+              color-mix(in srgb, var(--lane) 60%, #000) 100%);
+}
+
+/* Wertanzeige neben dem Regler. Feste Zeichenbreite, damit nichts springt. */
+.slider-val {
+  min-inline-size: 4ch;
+  text-align: end;
+  color: var(--c-accent);
+  font: 600 var(--fs-md)/1 var(--ff-mono);
+}
+.lane-card .slider-val { color: var(--lane); }
+.slider-val small { color: var(--c-text-mute); font-weight: 400; }
+
+/* --- Schalter-Chip (an/aus) -----------------------------------------------
+   Zustand über Füllung + Rahmen + führendes Unicode-Zeichen. Die Anwendung
+   tauscht ● / ○ selbst aus; CSS verlässt sich nicht darauf.               */
+.chip {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  min-block-size: var(--h-ctl);
+  padding-inline: var(--sp-3);
+  border: 1px solid var(--c-border-ctl);
+  border-radius: var(--r-pill);
+  background: var(--c-panel-2);
+  color: var(--c-text-dim);
+  font: 500 var(--fs-md)/1 var(--ff);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--t-base) var(--ease),
+              border-color var(--t-base) var(--ease),
+              color var(--t-base) var(--ease);
+}
+.chip:hover { border-color: var(--c-border-hi); color: var(--c-text); }
+.chip[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--c-accent) 18%, var(--c-panel-2));
+  border-color: var(--c-accent);
+  color: var(--c-accent);
+}
+.chip[aria-pressed="true"]:hover { background: color-mix(in srgb, var(--c-accent) 26%, var(--c-panel-2)); }
+
+/* Semantische Chip-Varianten. */
+.chip--lock[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--c-warn) 16%, var(--c-panel-2));
+  border-color: var(--c-warn); color: var(--c-warn);
+}
+.chip--inf[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--c-violet) 20%, var(--c-panel-2));
+  border-color: var(--c-violet); color: var(--c-violet-text);
+}
+.chip--lane[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--lane) 18%, var(--c-panel-2));
+  border-color: var(--lane); color: var(--lane);
+}
+.chip--sm { min-block-size: var(--h-ctl); padding-inline: var(--sp-2); font-size: var(--fs-sm); }
+
+/* --- Knöpfe ---------------------------------------------------------------
+   Vier Rollen: primär (Cyan), sekundär (Umriss), gefährlich (Rot), Sonder
+   (Violett/Grün). Alle gefüllten Flächen tragen kontrastgeprüfte Schrift:
+   auf Cyan dunkel, auf Rot/Violett/Grün weiss.                            */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  min-block-size: var(--h-ctl);
+  padding-inline: var(--sp-4);
+  border: 1px solid transparent;
+  border-radius: var(--r-3);
+  font: 600 var(--fs-md)/1 var(--ff);
+  letter-spacing: .04em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--t-base) var(--ease),
+              border-color var(--t-base) var(--ease),
+              box-shadow var(--t-base) var(--ease),
+              translate var(--t-fast) var(--ease);
+}
+.btn:active:not(:disabled) { translate: 0 1px; }
+
+.btn--primary {
+  background: linear-gradient(160deg, var(--c-accent), var(--c-accent-dim));
+  color: var(--c-text-on-accent);            /* 10.7:1 */
+  box-shadow: var(--sh-1);
+}
+.btn--primary:hover:not(:disabled) { box-shadow: var(--sh-1), var(--glow-accent); }
+
+.btn--secondary {
+  background: var(--c-panel-2);
+  border-color: var(--c-border-ctl);
+  color: var(--c-text);
+}
+.btn--secondary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--c-accent) 10%, var(--c-panel-2));
+  border-color: var(--c-border-hi);
+}
+
+.btn--danger {
+  background: var(--c-err-solid);             /* Weiss darauf 5.69:1 */
+  color: #ffffff;
+}
+.btn--danger:hover:not(:disabled) { background: color-mix(in srgb, var(--c-err-solid) 80%, #fff); }
+
+.btn--violet { background: var(--c-violet-solid); color: #ffffff; }   /* 5.70:1 */
+.btn--violet:hover:not(:disabled) { background: color-mix(in srgb, var(--c-violet-solid) 82%, #fff); }
+
+.btn--ok { background: var(--c-ok-solid); color: #ffffff; }           /* 5.41:1 */
+.btn--ok:hover:not(:disabled) { background: color-mix(in srgb, var(--c-ok-solid) 80%, #fff); }
+
+.btn--ghost {
+  background: none; border-color: var(--c-border-soft); color: var(--c-text-dim);
+}
+.btn--ghost:hover:not(:disabled) { color: var(--c-text); border-color: var(--c-border-ctl); }
+
+.btn--lg { min-block-size: var(--h-ctl-lg); padding-inline: var(--sp-5); font-size: var(--fs-base); }
+.btn--icon { padding-inline: 0; inline-size: var(--h-ctl); }
+.btn--icon.btn--lg { inline-size: var(--h-ctl-lg); }
+
+/* --- Segment-Umschalter ---------------------------------------------------
+   Für sich gegenseitig ausschliessende Werte (Bars/Chord, Loop, Transport-
+   befehl). Ersetzt Selects mit drei bis vier Optionen — ein Klick statt zwei.
+   Markup: <div class="segment" role="radiogroup"> mit <button role="radio">. */
+.segment {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--c-border-ctl);
+  border-radius: var(--r-3);
+  background: var(--c-panel-2);
+  min-block-size: var(--h-ctl);
+}
+.segment > button {
+  appearance: none;
+  min-block-size: calc(var(--h-ctl) - 6px);
+  padding-inline: var(--sp-3);
+  border: none;
+  border-radius: var(--r-2);
+  background: none;
+  color: var(--c-text-dim);
+  font: 500 var(--fs-md)/1 var(--ff);
+  cursor: pointer;
+  transition: background var(--t-base) var(--ease), color var(--t-base) var(--ease);
+}
+.segment > button:hover { color: var(--c-text); background: color-mix(in srgb, var(--c-accent) 10%, transparent); }
+.segment > button[aria-checked="true"] {
+  background: color-mix(in srgb, var(--c-accent) 22%, var(--c-panel));
+  color: var(--c-accent);
+  box-shadow: inset 0 0 0 1px var(--c-accent);
+}
+
+/* --- Statuszeile ---------------------------------------------------------- */
+.status {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  color: var(--c-text-dim);
+  font-size: var(--fs-md);
+}
+.dot {
+  inline-size: 9px; block-size: 9px; border-radius: 50%;
+  background: var(--c-text-disabled);
+  flex: none;
+}
+.dot--ok   { background: var(--c-ok);   box-shadow: 0 0 8px var(--c-ok); }
+.dot--warn { background: var(--c-warn); box-shadow: 0 0 8px var(--c-warn); }
+.dot--err  { background: var(--c-err);  box-shadow: 0 0 8px var(--c-err); }
+/* Der Punkt allein reicht nicht — daneben steht immer Text. Fällt der Text
+   weg, blendet CSS ein Zeichen ein. */
+.status:not(:has(.status-text))::after { content: "\2014"; color: var(--c-text-mute); }
+
+/* ============================================================================
+   09 LANE-KARTE
+   Eine Zeile pro Lane. Kopf mit Identitätsfarbe und Schaltern, darunter ein
+   12-Spalten-Raster für die Bedienelemente. Kein Etikett über dem Element,
+   sondern darüber in Kleinschrift — hier ist die Spaltenzahl wichtiger als
+   die Zeilenhöhe, weil neun bis zwölf Elemente nebeneinander müssen.
+   ========================================================================== */
+.lane-card {
+  --lane: var(--c-accent);
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  border: 1px solid var(--c-border-soft);
+  border-inline-start: 4px solid var(--lane);
+  border-radius: var(--r-3);
+  background: var(--c-panel-2);
+  transition: opacity var(--t-base) var(--ease), filter var(--t-base) var(--ease);
+  container: lane / inline-size;
+}
+.lane-card[data-lane="drums"]  { --lane: var(--lane-drums); }
+.lane-card[data-lane="bass"]   { --lane: var(--lane-bass); }
+.lane-card[data-lane="chords"] { --lane: var(--lane-chords); }
+.lane-card[data-lane="arp"]    { --lane: var(--lane-arp); }
+.lane-card[data-lane="melody"] { --lane: var(--lane-melody); }
+
+/* Ausgeschaltete Lane: deutlich zurückgenommen, aber lesbar.
+   Der Zustand wird über VIER Mittel gleichzeitig gezeigt — dunklere Fläche,
+   entsättigte Farben, graue statt farbiger Kante, grauer Lane-Name — statt
+   über eine einzige starke Deckkraftabsenkung. Grund: bei opacity .55 fällt
+   der Etikettentext auf 3.2:1 und verfehlt WCAG AA. Bei .8 bleibt der
+   schwächste Text bei 5.1:1 und der Zustand ist trotzdem eindeutig. */
+.lane-card:has(.lane-power[aria-pressed="false"]) {
+  opacity: .8;
+  filter: saturate(.3);
+  background: #0c1424;
+  border-inline-start-color: var(--c-border-ctl);
+  box-shadow: none;
+}
+.lane-card:has(.lane-power[aria-pressed="false"]) .lane-name { color: var(--c-text-dim); }
+/* Der Ein/Aus-Schalter selbst bleibt voll gesättigt und lesbar. */
+.lane-card:has(.lane-power[aria-pressed="false"]) .lane-power { filter: none; }
+
+/* Solo blendet die anderen zurück, ohne sie auszuschalten. Graustufe statt
+   Entsättigung — dadurch klar von "aus" unterscheidbar. */
+.view--lanes:has(.lane-solo[aria-pressed="true"]) .lane-card:not(:has(.lane-solo[aria-pressed="true"])) {
+  filter: grayscale(1);
+  opacity: .82;
+}
+
+.lane-head {
+  display: flex; align-items: center; gap: var(--sp-2);
+  min-block-size: var(--h-ctl);
+}
+.lane-name {
+  color: var(--lane);
+  font: 700 var(--fs-md)/1 var(--ff);
+  letter-spacing: .16em;
+  min-inline-size: 6.5ch;
+}
+.lane-ch {
+  color: var(--c-text-mute);
+  font: 500 var(--fs-sm)/1 var(--ff-mono);
+  margin-inline-start: auto;
+}
+
+/* 12 Spalten. Style spannt 3, Sound 2, alles andere 1. Bei 1188px nutzbarer
+   Breite ergibt das 91px pro Spur — genug für einen Regler mit Wertanzeige. */
+.lane-controls {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: var(--sp-2);
+  row-gap: var(--sp-2);
+  align-items: end;
+}
+.lane-controls > .field { gap: 2px; }
+.lane-controls > .field > .lbl { font-size: var(--fs-micro); letter-spacing: .05em; }
+.span-2 { grid-column: span 2; }
+.span-3 { grid-column: span 3; }
+.span-4 { grid-column: span 4; }
+
+/* Wird die Lane schmal (Seitenleiste offen + schmaler Bildschirm), fallen
+   die Spuren zusammen statt zu überlaufen. */
+@container lane (inline-size < 900px) {
+  .lane-controls { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+@container lane (inline-size < 520px) {
+  .lane-controls { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* ============================================================================
+   10 TAKT-KACHELN, VORSCHLÄGE, QUINTENZIRKEL
+   ========================================================================== */
+.bars {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(74px, 1fr));
+  gap: var(--sp-2);
+}
+.bar-cell {
+  position: relative;
+  min-block-size: 46px;
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--c-border-ctl);
+  border-radius: var(--r-2);
+  background: var(--c-field);
+  color: var(--c-text);
+  text-align: center;
+  cursor: pointer;
+  transition: background var(--t-base) var(--ease), border-color var(--t-base) var(--ease);
+}
+.bar-cell .n {
+  display: block;
+  font: 500 var(--fs-micro)/1.2 var(--ff-mono);
+  color: var(--c-text-mute);           /* 4.98:1 auf der Feldfüllung */
+}
+.bar-cell .name { display: block; font: 700 var(--fs-base)/1.2 var(--ff); }
+.bar-cell .fn   { display: block; font: 700 var(--fs-micro)/1.2 var(--ff); color: var(--c-violet-text); }
+.bar-cell:hover { border-color: var(--c-border-hi); background: var(--c-field-hi); }
+.bar-cell[aria-current="true"] {
+  border-color: var(--c-accent);
+  background: color-mix(in srgb, var(--c-accent) 20%, var(--c-field));
+  box-shadow: var(--glow-accent);
+}
+.bar-cell[aria-current="true"] .name { color: var(--c-accent); }
+/* Gesperrter Takt: gelbe Kante plus Schlosszeichen oben rechts. */
+.bar-cell[data-locked]::after {
+  content: "\1F512";
+  position: absolute; inset-block-start: -7px; inset-inline-end: -4px;
+  font-size: var(--fs-micro);
+}
+.bar-cell[data-locked] {
+  border-color: var(--c-warn);
+  background: color-mix(in srgb, var(--c-warn) 12%, var(--c-field));
+}
+
+/* Vorschlagskacheln (nächster Akkord, Stufen). */
+.suggest { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.sug {
+  min-block-size: var(--h-ctl);
+  min-inline-size: 62px;
+  padding: var(--sp-1) var(--sp-3);
+  border: 1px solid var(--c-border-ctl);
+  border-radius: var(--r-2);
+  background: var(--c-field);
+  color: var(--c-text);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--t-base) var(--ease), background var(--t-base) var(--ease);
+}
+.sug .deg  { display: block; font: 700 var(--fs-micro)/1.2 var(--ff); color: var(--c-violet-text); }
+.sug .name { display: block; font: 600 var(--fs-md)/1.2 var(--ff); }
+.sug:hover { border-color: var(--c-violet); background: color-mix(in srgb, var(--c-violet) 14%, var(--c-field)); }
+/* Chromatischer Vorschlag: andere Farbe UND kursive Stufenbezeichnung. */
+.sug[data-chromatic] .deg { color: var(--lane-bass); font-style: italic; }
+.sug[data-chromatic]:hover { border-color: var(--lane-bass); }
+
+/* Quintenzirkel: SVG bleibt quadratisch und schrumpft mit der Karte. */
+.circle-of-fifths {
+  inline-size: 100%;
+  max-inline-size: 300px;
+  aspect-ratio: 1;
+  margin-inline: auto;
+}
+.circle-of-fifths .node { cursor: pointer; transition: opacity var(--t-fast) var(--ease); }
+.circle-of-fifths .node:hover { opacity: .72; }
+.circle-of-fifths .node:focus-visible { outline: var(--focus-w) solid var(--c-focus); }
+
+/* Leitereigene Akkorde als kleine Marken. */
+.key-chip {
+  display: inline-block;
+  padding: 2px var(--sp-2);
+  margin: 2px 3px 2px 0;
+  border: 1px solid var(--c-border-ctl);
+  border-radius: var(--r-1);
+  background: var(--c-field);
+  color: var(--c-text-dim);
+  font-size: var(--fs-sm);
+}
+.key-chip[data-tonic] { border-color: var(--c-accent); color: var(--c-accent); }
+
+/* ============================================================================
+   11 LOG, MIDI-MONITOR, KANAL-BELEGUNG
+   ========================================================================== */
+.log {
+  min-block-size: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--c-border-soft);
+  border-radius: var(--r-2);
+  background: var(--c-sunken);
+  font: 400 var(--fs-sm)/1.55 var(--ff-mono);
+  color: var(--c-text-dim);          /* KORREKTUR: war #5a5a72 = 2.94:1 */
+  scrollbar-gutter: stable;
+}
+.log > * { display: block; }
+/* Semantik im Protokoll: Farbe UND ein vorangestelltes Zeichen, damit die
+   Kategorie auch ohne Farbwahrnehmung erkennbar ist. */
+.log .i::before  { content: "· ";  }
+.log .ok::before { content: "\2713 "; }
+.log .w::before  { content: "\26A0 "; }
+.log .e::before  { content: "\2717 "; }
+.log .m::before  { content: "\2726 "; }
+.log .i  { color: var(--c-accent); }        /* 11.1:1 */
+.log .ok { color: var(--c-ok); }            /* 10.9:1 */
+.log .w  { color: var(--c-warn); }          /* 13.0:1 */
+.log .e  { color: var(--c-err); }           /*  6.5:1 */
+.log .m  { color: var(--c-violet-text); }   /*  9.0:1 */
+.log .p  { color: var(--lane-bass); }       /*  8.3:1 */
+
+/* MIDI-Monitor ist ein Log mit anderer Semantik — im Markup .log .monitor. */
+.monitor { font-size: var(--fs-micro); line-height: 1.45; }
+.monitor .blk::before { content: "BLOCK "; }
+.monitor .snd::before { content: "SEND  "; }
+.monitor .blk { color: var(--c-err); }
+.monitor .snd { color: var(--c-ok); }
+
+/* Kanal-Belegung: 16 Zellen. */
+.channels {
+  display: grid;
+  grid-template-columns: repeat(16, minmax(0, 1fr));
+  gap: var(--sp-1);
+}
+.ch-cell {
+  min-block-size: 38px;
+  padding: var(--sp-1) 0;
+  border: 1px solid var(--c-border-soft);
+  border-radius: var(--r-1);
+  background: var(--c-panel-2);
+  color: var(--c-text-mute);          /* KORREKTUR: war #6b7796 = 3.95:1 */
+  font: 500 var(--fs-sm)/1.2 var(--ff-mono);
+  text-align: center;
+  transition: background var(--t-fast) linear, color var(--t-fast) linear;
+}
+.ch-cell .cnt { display: block; font-size: var(--fs-micro); opacity: .8; }
+/* Belegter Kanal trägt die Lane-Farbe als Füllung und Kante. */
+.ch-cell[data-lane] {
+  background: color-mix(in srgb, var(--lane) 20%, var(--c-panel-2));
+  border-color: var(--lane);
+  color: var(--c-text);
+}
+.ch-cell[data-lane="drums"]  { --lane: var(--lane-drums); }
+.ch-cell[data-lane="bass"]   { --lane: var(--lane-bass); }
+.ch-cell[data-lane="chords"] { --lane: var(--lane-chords); }
+.ch-cell[data-lane="arp"]    { --lane: var(--lane-arp); }
+.ch-cell[data-lane="melody"] { --lane: var(--lane-melody); }
+/* Aktivität: kurzes Aufleuchten, nur einmal, ohne Dauerschleife. */
+.ch-cell[data-active] { background: color-mix(in srgb, var(--lane) 45%, var(--c-panel-2)); }
+
+/* Routing-Zeile in Monospace, damit Kanalnummern untereinander stehen. */
+.routing {
+  font: 400 var(--fs-sm)/1.5 var(--ff-mono);
+  color: var(--c-text-mute);
+}
+.routing b { color: var(--c-accent); font-weight: 600; }
+
+/* ============================================================================
+   12 PIANO-DOCK
+   Bleibt in allen sieben Bereichen sichtbar. Einklappbar auf eine 30px-Leiste.
+   ========================================================================== */
+.piano-dock {
+  display: grid;
+  grid-template-rows: var(--h-piano-min) minmax(0, 1fr);
+  block-size: var(--h-piano);
+  background: var(--c-rail);
+  border-block-start: 1px solid var(--c-border-soft);
+  overflow: clip;
+  transition: block-size var(--t-slow) var(--ease);
+  z-index: 20;
+}
+.app:has(.piano-toggle[aria-expanded="false"]) .piano-dock { block-size: var(--h-piano-min); }
+
+.piano-bar {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding-inline: var(--sp-4);
+  color: var(--c-text-mute);
+  font: 600 var(--fs-tiny)/1 var(--ff);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.piano-toggle {
+  margin-inline-start: auto;
+  min-block-size: 24px; padding-inline: var(--sp-2);
+  border: 1px solid var(--c-border-soft);
+  border-radius: var(--r-1);
+  background: none;
+  color: var(--c-text-mute);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.piano-toggle:hover { color: var(--c-text); border-color: var(--c-border-ctl); }
+.piano-toggle[aria-expanded="false"]::after { content: " \25B4"; }
+.piano-toggle[aria-expanded="true"]::after  { content: " \25BE"; }
+
+.piano {
+  position: relative;
+  block-size: 74px;
+  margin-inline: var(--sp-4);
+  overflow-x: auto;
+  overflow-y: clip;
+  scrollbar-width: none;
+}
+.key-w, .key-b { position: absolute; inset-block-start: 0; }
+.key-w {
+  inline-size: 22px; block-size: 72px;
+  background: linear-gradient(180deg, #cfd3de, #ffffff);
+  border: 1px solid #2a3350;
+  border-radius: 0 0 3px 3px;
+  z-index: 1;
+}
+.key-b {
+  inline-size: 14px; block-size: 45px;
+  background: linear-gradient(180deg, #12141f, #333c55);
+  border: 1px solid #000;
+  border-radius: 0 0 3px 3px;
+  z-index: 2;
+}
+/* Klingende Note: Lane-Farbe. Zusätzlich ein farbiger Streifen am unteren
+   Rand der Taste, damit auch bei Farbschwäche eine Bewegung sichtbar ist. */
+.key-w[data-lane], .key-b[data-lane] {
+  background: var(--lane);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--lane) 70%, transparent);
+}
+.key-w[data-lane="drums"],  .key-b[data-lane="drums"]  { --lane: var(--lane-drums); }
+.key-w[data-lane="bass"],   .key-b[data-lane="bass"]   { --lane: var(--lane-bass); }
+.key-w[data-lane="chords"], .key-b[data-lane="chords"] { --lane: var(--lane-chords); }
+.key-w[data-lane="arp"],    .key-b[data-lane="arp"]    { --lane: var(--lane-arp); }
+.key-w[data-lane="melody"], .key-b[data-lane="melody"] { --lane: var(--lane-melody); }
+
+/* ============================================================================
+   13 HILFSKLASSEN
+   ========================================================================== */
+.mono   { font-family: var(--ff-mono); }
+.dim    { color: var(--c-text-mute); }
+.grow   { flex: 1 1 auto; min-inline-size: 0; }
+.nowrap { white-space: nowrap; }
+.stack  { display: grid; gap: var(--sp-2); align-content: start; }
+.stack--tight { gap: var(--sp-1); }
+.fill   { min-block-size: 0; flex: 1 1 auto; }
+.sr-only {
+  position: absolute; inline-size: 1px; block-size: 1px;
+  margin: -1px; padding: 0; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+
+/* Scroll-Schatten am oberen Rand des Inhalts: zeigt an, dass oben noch etwas
+   liegt. Scroll-gesteuerte Animation, sparsam eingesetzt — genau eine. */
+.content::before {
+  content: "";
+  position: sticky;
+  inset-block-start: 0;
+  display: block;
+  block-size: 10px;
+  margin-block-end: -10px;
+  background: linear-gradient(var(--c-app), transparent);
+  opacity: 0;
+  z-index: 5;
+  animation: scroll-shadow linear both;
+  animation-timeline: scroll(nearest block);
+  animation-range: 0 40px;
+}
+@keyframes scroll-shadow { to { opacity: 1; } }
+
+/* ============================================================================
+   14 BEWEGUNG REDUZIEREN
+   Alles Dekorative aus; funktionale Rückmeldung (Beat-Punkte, Zustands-
+   wechsel) bleibt, weil sie Information trägt — nur ohne Übergang.
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+  .view { animation: none; }
+  .content::before { animation: none; opacity: 0; }
+  input[type="range"]:hover::-webkit-slider-thumb,
+  input[type="range"]:active::-webkit-slider-thumb { scale: 1; }
+}
+
+/* Hoher Kontrast angefordert: Rahmen aller Bedienelemente verstärken. */
+@media (prefers-contrast: more) {
+  :root {
+    --c-border-soft: #3a6ea8;
+    --c-border-ctl:  #7fb0e8;
+    --c-text-mute:   #c2cbe0;
+  }
+}
+
+/* ============================================================
+   TABULATUR-DOCK — Klaviatur | Tabulatur, je mit Lane-Filtern
+   Die Bundzahl steht AUF der Saitenlinie; eine belegte Zelle
+   blendet ihre Linie aus (wie im ASCII-Tab: --3--).
+   ============================================================ */
+.dock-body{
+  display:grid;
+  grid-template-columns:clamp(280px,25%,1150px) minmax(0,1fr);
+  gap:var(--sp-5);
+  margin-inline:var(--sp-4);
+  min-block-size:0;
+}
+.vis-chips{display:inline-flex;gap:4px;letter-spacing:normal;text-transform:none;}
+.vis-chip{
+  min-block-size:20px;padding-inline:6px;
+  border:1px solid color-mix(in srgb,var(--lane) 60%,transparent);
+  border-radius:var(--r-1);
+  background:color-mix(in srgb,var(--lane) 12%,transparent);
+  color:var(--lane);
+  font:600 var(--fs-micro)/1 var(--ff-mono);
+  cursor:pointer;
+}
+.vis-chip::before{content:"\25CF\00a0";}
+.vis-chip[aria-pressed="false"]{
+  background:none;color:var(--c-text-mute);
+  border-color:var(--c-border-soft);
+}
+.vis-chip[aria-pressed="false"]::before{content:"\25CB\00a0";}
+.vis-chip:hover{border-color:var(--lane);}
+.tab{
+  display:grid;
+  grid-template-columns:24px repeat(64,minmax(0,1fr));
+  position:relative;
+  grid-template-rows:26px repeat(6,1fr);
+  block-size:196px;
+  font:600 16px/1 var(--ff-mono);
+}
+.tab .ts{
+  color:var(--c-text-mute);
+  display:flex;align-items:center;
+}
+.tab .tc{
+  position:relative;
+  color:var(--lane,var(--c-text));
+  background:linear-gradient(var(--c-border-soft),var(--c-border-soft)) 0 50%/100% 1px no-repeat;
+}
+.tab .tc.tbeat{
+  background:
+    linear-gradient(var(--c-border-soft),var(--c-border-soft)) 0 0/1px 100% no-repeat,
+    linear-gradient(var(--c-border-soft),var(--c-border-soft)) 0 50%/100% 1px no-repeat;
+}
+.tab .tc.tbar{
+  background:
+    linear-gradient(var(--c-border-ctl),var(--c-border-ctl)) 0 0/1px 100% no-repeat,
+    linear-gradient(var(--c-border-soft),var(--c-border-soft)) 0 50%/100% 1px no-repeat;
+}
+.tab-cur{
+  position:absolute;inset-block:0;
+  inline-size:calc((100% - 24px)/8);
+  inset-inline-start:calc(24px + (100% - 24px)*var(--bar,0)/8);
+  background:color-mix(in srgb,var(--c-accent) 14%,transparent);
+  border-inline:1px solid color-mix(in srgb,var(--c-accent) 50%,transparent);
+  pointer-events:none;
+  transition:inset-inline-start var(--t-fast,.12s) linear;
+}
+.tab-play{
+  position:absolute;inset-block:0;inline-size:2px;
+  inset-inline-start:calc(24px + (100% - 24px)*var(--pos,0)/8);
+  background:var(--c-accent);
+  box-shadow:0 0 6px var(--c-accent);
+  opacity:0;pointer-events:none;
+}
+.tab .tc b{
+  position:absolute;
+  inset-inline-start:var(--fx,50%);inset-block-start:50%;
+  transform:translate(-50%,-50%);
+  background:var(--c-rail);padding-inline:3px;font-weight:600;
+}
+.vis-mode{
+  min-block-size:20px;padding-inline:6px;
+  border:1px solid var(--c-border-soft);
+  border-radius:var(--r-1);
+  background:none;color:var(--c-text-mute);
+  font:600 var(--fs-micro)/1 var(--ff-mono);
+  letter-spacing:normal;text-transform:none;
+  cursor:pointer;
+}
+.vis-mode:hover{color:var(--c-text);border-color:var(--c-border-ctl);}
+.vis-mode[aria-pressed="true"]{color:var(--c-accent);border-color:color-mix(in srgb,var(--c-accent) 60%,transparent);background:var(--c-accent-wash);}
+
+/* Setup-Lade-Menue an der Transportleiste */
+.su-menu{
+  position:fixed;z-index:100;
+  display:flex;flex-direction:column;gap:2px;
+  padding:6px;min-inline-size:200px;max-block-size:60vh;overflow:auto;
+  background:#131326;
+  border:1px solid var(--c-border-ctl);
+  border-radius:var(--r-1);
+  box-shadow:0 8px 24px rgba(0,0,0,.55);
+}
+.su-menu button{
+  min-block-size:28px;padding-inline:10px;text-align:start;
+  background:none;border:1px solid transparent;border-radius:var(--r-1);
+  color:var(--c-text);font:500 var(--fs-sm)/1 var(--ff);cursor:pointer;
+}
+.su-menu button:hover{background:var(--c-accent-wash);border-color:var(--c-border-ctl);}
+.su-menu .su-empty{color:var(--c-text-mute);font:500 var(--fs-sm)/1.4 var(--ff);padding:6px;}
+
+/* Akkordzeile ueber der Tabulatur + Griffbild-Popup */
+.tab .tch{
+  position:relative;
+  font:700 16px/26px var(--ff-mono);
+  color:var(--c-accent);
+  white-space:nowrap;overflow:visible;
+}
+.tab .tch.has{cursor:pointer;}
+.tab .tch.has:hover{color:#8ee9ff;text-decoration:underline;}
+.chord-pop{
+  position:fixed;z-index:120;
+  display:flex;gap:10px;align-items:flex-start;
+  padding:10px;
+  background:#131326;
+  border:1px solid var(--c-border-ctl);
+  border-radius:var(--r-1);
+  box-shadow:0 10px 28px rgba(0,0,0,.6);
+}
+.chord-pop .cp-head{
+  position:absolute;inset-block-start:-1px;inset-inline-start:-1px;
+  padding:2px 8px;
+  background:var(--c-accent);color:#04121b;
+  font:700 var(--fs-micro)/1.6 var(--ff-mono);
+  border-radius:var(--r-1) 0 var(--r-1) 0;
+}
+.chord-pop figure{margin:14px 0 0;display:flex;flex-direction:column;align-items:center;gap:2px;}
+.chord-pop figcaption{font:600 var(--fs-micro)/1 var(--ff);color:var(--c-text-mute);}
+
+/* Songbook-Modus: Griffbilder permanent ueber der Tabulatur ---------------
+   Wie im gedruckten Notenblatt: Mini-Diagramm mit Namen an jedem
+   Akkordwechsel. Zustand lebt am Schalter (#diaTgl), CSS reagiert per
+   :has() - keine Spiegelklasse noetig. */
+.app:has(#diaTgl[aria-pressed="true"]) .piano-dock{block-size:320px;}
+.app:has(#diaTgl[aria-pressed="true"]) .tab{
+  grid-template-rows:96px repeat(6,1fr);
+  block-size:288px;
+}
+.app:has(#diaTgl[aria-pressed="true"]) .tab .tch{
+  display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;
+  line-height:22px;
+}
+.tab .tch svg{display:block;inline-size:84px;block-size:63px;}
+.dock-body{align-items:end;}
+.piano-wrap{margin-block-end:2px;}
+
+/* =========================================================================
+   MIDI-IMPORT (Version 5) — Drop-Zone und Review-Kacheln
+   ========================================================================= */
+.imp-drop {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: 52px; padding: 8px;
+  border: 1px dashed var(--c-border-ctl); border-radius: 8px;
+  color: var(--c-text-dim); background: var(--c-panel-2);
+}
+.imp-drop.is-over {
+  border-color: var(--c-accent); border-style: solid;
+  background: var(--c-accent-wash); color: var(--c-text);
+}
+.imp-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.imp-chip {
+  padding: 2px 7px; border-radius: 6px; font-size: 0.78rem;
+  font-family: var(--font-mono, monospace);
+  background: var(--c-field); color: var(--c-text);
+  border: 1px solid var(--c-border-ctl);
+}
+.imp-chip--warn {
+  border-color: var(--c-warn); color: var(--c-warn);
+  border-style: dashed; /* unsicher erkannt oder Wechsel in Taktmitte */
+}
+/* Export-Spalten: wird eine Karte vom Hoehenbudget gequetscht, scrollt sie
+   intern statt in die Nachbarkarte zu laufen — dasselbe Muster wie im
+   Song-Bereich (layout.css). Noetig, seit die Import-Karte dazukam. */
+.view--export > .col > .card { overflow: auto; scrollbar-gutter: stable; }
+.imp-chips { max-block-size: 76px; overflow: auto; }
