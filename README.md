@@ -123,3 +123,8 @@ File-Input bis zur Progression im Song-Bereich.
 ## Lizenz
 
 MIT — siehe [LICENSE](LICENSE).
+
+
+## Spendiere mir einen Kaffee
+
+Wenn dir MIDI PERFECT 5 die Arbeit erleichtert: PayPal @guenuy — https://paypal.me/guenuy
